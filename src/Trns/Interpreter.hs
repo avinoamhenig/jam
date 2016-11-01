@@ -30,7 +30,6 @@ runScript prog env (TrnsScript (cmd:rest)) =
   in runScript (fst r) (snd r) $ TrnsScript rest
 
 runCmd :: Prog -> Env -> TrnsCmd -> (Prog, Env)
--- TODO test bindings
 runCmd p env (BndCmd scopeName (IdName idName) valName) =
   case lookup scopeName $ expNames env of
     Nothing -> error $ "No Exp named " ++ (show scopeName)

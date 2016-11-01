@@ -94,7 +94,7 @@ _wrapLet e s =
   in if (length letStr) > 0
       then "(let " ++ letStr ++ " in " ++ (_deparen s) ++ ")"
       else s
-instance Show Exp where -- TODO show bindings
+instance Show Exp where
   show e@(BottomExp {}) = _wrapLet e $ "_"
   show e@(UnitExp {}) = _wrapLet e $ "()"
   show e@(NumExp { value = val }) = _wrapLet e $ show val
