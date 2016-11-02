@@ -1,4 +1,8 @@
-rpl :root App(:rf :ra)
+# is_zero
+
+rpl :root App(:rf :ra
+
+
 bnd :root $is_zero :is_zero
 rpl :is_zero Lambda($x :body)
 rpl :body If(:c :t :e)
@@ -13,5 +17,7 @@ rpl :a Unit()
 rpl :e App(:f :a)
 rpl :f IdExp($False)
 rpl :a Unit()
+
+
 rpl :rf IdExp($is_zero)
 rpl :ra Num(1)

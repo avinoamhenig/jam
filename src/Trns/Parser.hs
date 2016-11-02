@@ -9,9 +9,11 @@ import Control.Monad.Except
 
 readTrnsScript :: String -> Either ParseError TrnsScript
 readTrnsScript input =
-  case parse (pTrnsCmd `sepEndBy` newline) "TrnsScript" input of
+  case parse parseScript "TrnsScript" input of
     Left err -> throwError err
     Right val -> return $ TrnsScript val
+  where parseScript = do skipMany emptyline
+                         pTrnsCmd `sepEndBy` (many1 emptyline)
 
 readTrnsCmd :: String -> Either ParseError TrnsCmd
 readTrnsCmd input =
@@ -108,7 +110,18 @@ pIf =     do string "If("
              return $ CrIf c t e
 
 spaces :: Parser ()
-spaces = skipMany1 $ char ' '
+spaces = skipMany1 $ oneOf " \t"
 
 maybeSpaces :: Parser ()
-maybeSpaces = skipMany $ char ' '
+maybeSpaces = skipMany $ oneOf " \t"
+
+maybeComment :: Parser ()
+maybeComment = do
+  skipMany1 $ char '#'
+  skipMany  $ noneOf "\n"
+
+emptyline :: Parser ()
+emptyline = do
+  skipMany $ oneOf " \t"
+  optional maybeComment
+  skipMany1 newline
