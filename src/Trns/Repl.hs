@@ -3,9 +3,9 @@ module Trns.Repl where
 import System.Exit
 import Trns.Parser
 import Control.Monad
-import Control.Monad.Except
 import Lang.AST
 import Trns.Interpreter
+import Lang.Interpreter
 
 main :: IO ()
 main = repl makeProgram makeEnv
@@ -14,20 +14,29 @@ repl :: Prog -> Env -> IO ()
 repl prog env = do
   putStr "-> "
   line <- getLine
+
   when (line == ".e") exitSuccess
+
   when (take 2 line == ".l") $ do
     progAndEnv <- runFile ((strip $ drop 3 line) ++ ".trns") prog env
-    putStr $ show $ fst progAndEnv
-    putStr "\n\n"
-    repl (fst progAndEnv) (snd progAndEnv)
+    printProgAndLoop progAndEnv
+
+  when (take 2 line == ".r") $ do
+    printProg $ (interpret prog, env)
+    repl prog env
 
   -- runLine
-  let progAndEnv = runLine line prog env
-      newProg = fst progAndEnv
-      newEnv = snd progAndEnv
-  putStr $ show newProg
-  putStr "\n\n"
-  repl newProg newEnv
+  printProgAndLoop $ runLine line prog env
+
+printProg :: (Prog, Env) -> IO ()
+printProg progAndEnv = let s = show $ fst progAndEnv
+                       in do putStr $ (take ((length s) - 2) . drop 1) s
+                             putStr "\n\n"
+
+printProgAndLoop :: (Prog, Env) -> IO ()
+printProgAndLoop progAndEnv = do
+  printProg progAndEnv
+  repl (fst progAndEnv) (snd progAndEnv)
 
 runLine :: String -> Prog -> Env -> (Prog, Env)
 runLine code prog env = runCmd prog env cmd
@@ -46,6 +55,3 @@ rstrip = reverse . lstrip . reverse
 extractValue :: Either e a -> a
 extractValue (Left _) = error "Something went wrong"
 extractValue (Right val) = val
-
-trapError :: (Show a, MonadError a m) => m String -> m String
-trapError action = action `catchError` (return . show)

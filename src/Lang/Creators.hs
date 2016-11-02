@@ -1,5 +1,4 @@
 module Lang.Creators (
-  createProg,
   createUnit,
   createNum,
   createLambda,
@@ -8,17 +7,10 @@ module Lang.Creators (
   createIf
 ) where
 
-import Data.Map
+import Util.IndexedMap
 import Lang.AST
-import Lang.Basis
 
 _btm t = BottomExp { bindings = empty, typeof = t }
-
-createProg = Prog { root = _btm NoType
-                  , rootBindings = basisBindings
-                  , tydefs = basisTypes
-                  , tyvarMap = empty
-                  }
 
 createUnit = UnitExp { bindings = empty
                      , typeof = NoType
@@ -33,6 +25,7 @@ createLambda argName = LambdaExp { argId = Id argName NoType
                                  , body  = _btm NoType
                                  , bindings = empty
                                  , typeof = NoType
+                                 , capturedEnv = empty
                                  }
 
 createIdExp i = IdExp { ident = i

@@ -6,14 +6,12 @@ module Lang.AST (
   TyCon (..),
   TyVar (..),
   Type (..),
-  BuiltInReference,
-  BuiltIn (..),
   Exp (..),
   Arity,
   Bindings,
 ) where
 
-import Data.Map
+import Util.IndexedMap
 import Data.Unique
 
 type Bindings = Map Id BindingVal
@@ -27,7 +25,6 @@ data Prog = Prog { root :: Exp
 data BindingVal = ExpVal Exp
                 | TyConVal TyCon
                 | TyDefDeconVal TyDef
-                | BuiltInVal BuiltIn
 
 data Id = Id String Type
 instance Show Id where show (Id name _) = name
@@ -45,9 +42,6 @@ data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
           | NoType -- TODO: remove this
 
-type BuiltInReference = String
-data BuiltIn = BuiltIn BuiltInReference
-
 data Exp = BottomExp { typeof :: Type
                      , bindings :: Bindings
                      }
@@ -58,6 +52,7 @@ data Exp = BottomExp { typeof :: Type
                   , typeof :: Type
                   , bindings :: Bindings
                   }
+         | BuiltInExp (Exp -> Exp)
          | IdExp { ident :: Id
                  , bindings :: Bindings
                  , typeof :: Type
@@ -66,6 +61,7 @@ data Exp = BottomExp { typeof :: Type
                      , body :: Exp
                      , bindings :: Bindings
                      , typeof :: Type
+                     , capturedEnv :: Bindings
                      }
          | AppExp { func :: Exp
                   , argVal :: Exp
@@ -98,6 +94,7 @@ instance Show Exp where
   show e@(BottomExp {}) = _wrapLet e $ "_"
   show e@(UnitExp {}) = _wrapLet e $ "()"
   show e@(NumExp { value = val }) = _wrapLet e $ show val
+  show e@(BuiltInExp _) = _wrapLet e $ "<Built-in>"
   show e@(IdExp { ident = ident }) = _wrapLet e $ show ident
   show e@(LambdaExp {}) = _wrapLet e $  "(\\" ++ (show $ argId e)
                                               ++ " -> "

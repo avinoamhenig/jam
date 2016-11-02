@@ -12,7 +12,7 @@ module Lang.Accessors (
 ) where
 
 import Prelude hiding (lookup)
-import Data.Map
+import Util.IndexedMap
 import Lang.AST
 
 constructors (TyDef _ cs) = cs

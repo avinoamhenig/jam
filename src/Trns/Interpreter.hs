@@ -12,6 +12,7 @@ import Data.Map
 import Lang.AST
 import Trns.AST
 import Lang.Creators
+import Lang.CreateProg
 import Lang.Modifiers
 import Lang.Accessors
 

@@ -6,7 +6,7 @@ module Lang.Modifiers (
 import Prelude hiding (lookup)
 import Lang.AST
 import Lang.Accessors
-import Data.Map
+import Util.IndexedMap
 
 _bind :: Id -> BindingVal -> Exp -> Exp
 _bind i v e = e { bindings = insert i v $ bindings e }
