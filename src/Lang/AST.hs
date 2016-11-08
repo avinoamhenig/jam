@@ -11,10 +11,11 @@ module Lang.AST (
   Bindings,
 ) where
 
-import Util.IndexedMap
+import qualified Util.IndexedMap
+import Data.Map
 import Data.Unique
 
-type Bindings = Map Id BindingVal
+type Bindings = Util.IndexedMap.Map Id BindingVal
 
 data Prog = Prog { root :: Exp
                  , rootBindings :: Bindings
@@ -61,7 +62,7 @@ data Exp = BottomExp { typeof :: Type
                      , body :: Exp
                      , bindings :: Bindings
                      , typeof :: Type
-                     , capturedEnv :: Bindings
+                     , capturedEnv :: Maybe (Map Id BindingVal)
                      }
          | AppExp { func :: Exp
                   , argVal :: Exp
@@ -76,11 +77,11 @@ data Exp = BottomExp { typeof :: Type
                  }
 
 _deparen s
-  | (s !! 0) == '(' = (take ((length s) - 2) . drop 1) s
+  | (s !! 0) == '(' && length s > 2 = (take ((length s) - 2) . drop 1) s
   | otherwise = s
 _wrapLet e s =
   let bindingStrs =
-        foldWithKey
+        Util.IndexedMap.foldWithKey
           (\(Id name _) val acc -> case val of
             ExpVal ev -> ("(" ++ name ++ " = "
                               ++ (_deparen $ show ev) ++ ")") : acc
@@ -93,7 +94,7 @@ _wrapLet e s =
 instance Show Exp where
   show e@(BottomExp {}) = _wrapLet e $ "_"
   show e@(UnitExp {}) = _wrapLet e $ "()"
-  show e@(NumExp { value = val }) = _wrapLet e $ show val
+  show e@(NumExp { value = val }) = _wrapLet e (show val)
   show e@(BuiltInExp _) = _wrapLet e $ "<Built-in>"
   show e@(IdExp { ident = ident }) = _wrapLet e $ show ident
   show e@(LambdaExp {}) = _wrapLet e $  "(\\" ++ (show $ argId e)
@@ -106,4 +107,4 @@ instance Show Exp where
                                           ++ (show $ thenExp e) ++ " else "
                                           ++ (show $ elseExp e) ++ ")"
 
-instance Show Prog where show p = show $ root p
+instance Show Prog where show p = _deparen $ show $ root p

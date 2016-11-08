@@ -5,24 +5,36 @@ module Lang.Interpreter (
 import Prelude hiding (lookup)
 import Lang.AST
 import Lang.Basis
-import Util.IndexedMap
+import qualified Util.IndexedMap as IM
+import Data.Map
 
 interpret :: Prog -> Prog
 interpret = evalProg empty
 
-type Env = Bindings
+type Env = Map Id BindingVal
 
 extendEnv :: Env -> Id -> BindingVal -> Env
 extendEnv env ident value = insert ident value env
+
+mergeEnv :: Env -> Env -> Env
+mergeEnv e1 e2 = unionWith (\_ b -> b) e1 e2
 
 evalProg :: Env -> Prog -> Prog
 evalProg env prog = prog { root = evalExp newEnv prog $ root prog }
   where newEnv = evalBindings env prog $ rootBindings prog
 
 evalBindings :: Env -> Prog -> Bindings -> Env
-evalBindings env prog bindings = foldWithKey f env bindings
+evalBindings env prog bindings =
+    let newEnv = mergeEnv env $
+                  Data.Map.map (updateCe newEnv) $
+                    IM.foldWithKey f empty bindings
+    in newEnv
   where f ident bv newEnv = extendEnv newEnv ident $
-                              evalBindingVal env prog bv
+                              evalBindingVal (mergeEnv env newEnv) prog bv
+        updateCe newEnv bv = case bv of
+          ExpVal e@(LambdaExp { capturedEnv = (Just ce) }) ->
+            ExpVal $ e { capturedEnv = Just $ mergeEnv ce newEnv }
+          e -> e
 
 evalBindingVal :: Env -> Prog -> BindingVal -> BindingVal
 evalBindingVal env prog (ExpVal e) = ExpVal $ evalExp env prog e
@@ -40,16 +52,16 @@ evalExp environment prog e =
         Nothing -> error $ "Identifier does not exist: " ++ show ident
         Just bv -> case bv of
                     ExpVal val -> evalExp env prog val
-                    _ -> e { bindings = empty }
+                    _ -> e { bindings = IM.empty }
 
     IfExp {} -> let cond = evalExp env prog $ condExp e
-                in if (ident $ func cond) == (basisIds ! "True")
+                in if (ident $ func cond) == (basisIds IM.! "True")
                     then evalExp env prog $ thenExp e
                     else evalExp env prog $ elseExp e
 
-    LambdaExp {} -> if (size $ capturedEnv e) == 0
-                      then e { capturedEnv = env }
-                      else e
+    LambdaExp {} -> case capturedEnv e of
+                      Nothing -> e { capturedEnv = Just env }
+                      _ -> e
 
     AppExp {} ->
       let f = evalExp env prog $ func e
@@ -57,9 +69,13 @@ evalExp environment prog e =
       in case f of
           BuiltInExp bf -> bf x
           LambdaExp {} ->
-            evalExp (extendEnv (capturedEnv f) (argId f) $ ExpVal x)
-                    prog
-                    (body f)
+            case capturedEnv f of
+              Nothing -> error "Evaluated lambda has no captured environment!"
+              Just ce ->
+                -- evalExp (mergeEnv env $ extendEnv ce (argId f) $ ExpVal x)
+                evalExp (extendEnv ce (argId f) $ ExpVal x)
+                        prog
+                        (body f)
           IdExp { ident = ident } ->
             case lookup ident env of
               Nothing -> error $ "Identifier does not exist: " ++ show ident
@@ -68,7 +84,7 @@ evalExp environment prog e =
                   TyConVal _ -> AppExp { func = f
                                        , argVal = x
                                        , typeof = typeof e
-                                       , bindings = empty
+                                       , bindings = IM.empty
                                        }
                   -- TODO implement decon
                   TyDefDeconVal _ -> error "Decon not implemented yet"
@@ -78,4 +94,4 @@ evalExp environment prog e =
 
     -- Atoms
     BuiltInExp _ -> e
-    _ -> e { bindings = empty }
+    _ -> e { bindings = IM.empty }

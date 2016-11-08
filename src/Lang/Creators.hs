@@ -25,7 +25,7 @@ createLambda argName = LambdaExp { argId = Id argName NoType
                                  , body  = _btm NoType
                                  , bindings = empty
                                  , typeof = NoType
-                                 , capturedEnv = empty
+                                 , capturedEnv = Nothing
                                  }
 
 createIdExp i = IdExp { ident = i

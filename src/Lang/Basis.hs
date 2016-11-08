@@ -33,8 +33,7 @@ basisTypes = [
     boolType
   ]
 
-be f = ExpVal $ BuiltInExp f
-b f = BuiltInExp f
+b2 f = ExpVal $ BuiltInExp (\x -> BuiltInExp $ f x)
 
 basisIds = fromList [
     ( "False"      , Id "False" NoType      ),
@@ -45,23 +44,29 @@ basisIds = fromList [
     ( "-"          , Id "-" NoType          ),
     ( "*"          , Id "*" NoType          ),
     ( "/"          , Id "/" NoType          ),
-    ( "%"          , Id "%" NoType          )
+    ( "%"          , Id "%" NoType          ),
+    ( "<"          , Id "<" NoType          )
   ]
 
-builtInFuncs = fromList [
-  ("=", be (\x -> b (\y ->
-          let c = if (value x) == (value y) then "True" else "False"
-          in  AppExp { func = createIdExp (basisIds ! c)
+true = AppExp { func = createIdExp (basisIds ! "True")
+                    , argVal = createUnit
+                    , typeof = NoType
+                    , bindings = empty
+                    }
+false = AppExp { func = createIdExp (basisIds ! "False")
                      , argVal = createUnit
                      , typeof = NoType
                      , bindings = empty
                      }
-  ))),
-  ("+", be (\x -> b (\y -> createNum $ (value x) + (value y) ))),
-  ("-", be (\x -> b (\y -> createNum $ (value x) - (value y) ))),
-  ("*", be (\x -> b (\y -> createNum $ (value x) * (value y) ))),
-  ("/", be (\x -> b (\y -> createNum $ (value x) `quot` (value y) ))),
-  ("%", be (\x -> b (\y -> createNum $ (value x) `mod` (value y) )))
+
+builtInFuncs = fromList [
+  ("=", b2 (\x y -> if (value x) == (value y) then true else false )),
+  ("+", b2 (\x y -> createNum $ (value x) + (value y) )),
+  ("-", b2 (\x y -> createNum $ (value x) - (value y) )),
+  ("*", b2 (\x y -> createNum $ (value x) * (value y) )),
+  ("/", b2 (\x y -> createNum $ (value x) `quot` (value y) )),
+  ("%", b2 (\x y -> createNum $ (value x) `mod` (value y) )),
+  ("<", b2 (\x y -> if (value x) < (value y) then true else false ))
   ]
 
 basisBindings = fromList [
@@ -73,5 +78,6 @@ basisBindings = fromList [
     ( basisIds ! "-", builtInFuncs ! "-" ),
     ( basisIds ! "*", builtInFuncs ! "*" ),
     ( basisIds ! "/", builtInFuncs ! "/" ),
-    ( basisIds ! "%", builtInFuncs ! "%" )
+    ( basisIds ! "%", builtInFuncs ! "%" ),
+    ( basisIds ! "<", builtInFuncs ! "<" )
   ]

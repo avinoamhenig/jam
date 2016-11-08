@@ -1,0 +1,39 @@
+# factorial
+
+# create root exp first so that we don't overwrite root bindings later
+rpl :root App(:rf :ra)
+
+# create fact binding
+bnd :root $fact :fact
+
+# (\n if _ then _ else _)
+rpl :fact Lambda($n :body)
+rpl :body If(:c :t :e)
+
+# n = 0
+rpl :c App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($=)
+rpl :a1 IdExp($n)
+rpl :a2 Num(0)
+
+# base case: 1
+rpl :t Num(1)
+
+# recursive case: n * (fact (n - 1))
+rpl :e App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($*)
+rpl :a1 IdExp($n)
+
+rpl :a2 App(:f :a)
+rpl :f IdExp($fact)
+rpl :a App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($-)
+rpl :a1 IdExp($n)
+rpl :a2 Num(1)
+
+# root exp: fact 5
+rpl :rf IdExp($fact)
+rpl :ra Num(5)
