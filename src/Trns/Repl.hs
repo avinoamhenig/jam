@@ -4,8 +4,12 @@ import System.Exit
 import Trns.Parser
 import Control.Monad
 import Lang.AST
+import Trns.AST
 import Trns.Interpreter
 import Lang.Interpreter
+import Lang.Accessors
+import Data.Map
+import Prelude hiding (lookup)
 
 main :: IO ()
 main = repl makeProgram makeEnv
@@ -26,6 +30,26 @@ doCommand prog env (cmd:args)
       printProgAndLoop progAndEnv
   | cmd == "e" || cmd == "eval" = do printProg $ (interpret prog, env)
                                      repl prog env
+  | cmd == "t" || cmd == "typeof" =
+    let (prefix:name) = args !! 0
+        t = if prefix /= ':'
+            then let iname = if prefix == '$' then name else prefix:name
+                 in case lookup (IdName iname) (idNames env) of
+                      Nothing -> case findRootId prog iname of
+                        Nothing -> Nothing
+                        Just (Id _ t) -> Just t
+                      Just (Id _ t) -> Just t
+            else let ename = ExpName name
+                 in case lookup ename (expNames env) of
+                      Nothing -> Nothing
+                      Just path -> case expAtPath prog path of
+                        Nothing -> Nothing
+                        Just e -> Just $ typeof e
+    in do
+      case t of
+        Nothing -> putStr "Expression or identifier does not exist\n\n"
+        Just t -> putStr $ (deparen $ show (finalType prog t)) ++ "\n\n"
+      repl prog env
 doCommand prog env _ = do putStr "Unrecognized command.\n"
                           repl prog env
 

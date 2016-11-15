@@ -13,9 +13,9 @@ import Prelude hiding (lookup)
 import qualified Data.Map
 
 data Map k v = Map { kvMap :: Data.Map.Map k v
-                   , ikMap :: Data.Map.Map Integer k
-                   , kiMap :: Data.Map.Map k Integer
-                   , _i  :: Integer
+                   , ikMap :: Data.Map.Map Int k
+                   , kiMap :: Data.Map.Map k Int
+                   , _i  :: Int
                    } deriving (Eq)
 
 getMap :: Map k v -> Data.Map.Map k v

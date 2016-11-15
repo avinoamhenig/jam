@@ -8,8 +8,9 @@ import Lang.AST
 import Lang.Basis
 
 createProg = Prog { root = BottomExp { bindings = Util.IndexedMap.empty,
-                                       typeof = NoType }
-                  , rootBindings = basisBindings
-                  , tydefs = basisTypes
-                  , tyvarMap = empty
-                  }
+                                      typeof = TyVarType $ TyVar 0 }
+                 , rootBindings = basisBindings
+                 , tydefs = basisTypes
+                 , tyvarMap = empty
+                 , uniqC = 1
+                 }

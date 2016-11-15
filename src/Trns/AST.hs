@@ -10,7 +10,7 @@ newtype ExpName = ExpName String deriving (Eq, Ord)
 newtype IdName = IdName String deriving (Eq, Ord)
 
 data ExpCreator = CrUnit
-                | CrNum Integer
+                | CrNum Int
                 | CrLambda IdName ExpName
                 | CrIdExp IdName
                 | CrApp ExpName ExpName

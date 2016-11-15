@@ -8,14 +8,16 @@ module Lang.Accessors (
   expAtPath,
   constructors,
   findIdFromPath,
-  findRootId
+  findRootId,
+  finalType
 ) where
 
 import Prelude hiding (lookup)
 import Util.IndexedMap
+import qualified Data.Map as Map
 import Lang.AST
 
-constructors (TyDef _ cs) = cs
+constructors (TyDef _ _ cs) = cs
 
 data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
@@ -117,3 +119,9 @@ childExpSetter IfCondIndex e@(IfExp{}) = Just $ (\c -> e { condExp = c })
 childExpSetter IfThenIndex e@(IfExp{}) = Just $ (\c -> e { thenExp = c })
 childExpSetter IfElseIndex e@(IfExp{}) = Just $ (\c -> e { elseExp = c })
 childExpSetter _ _ = Nothing
+
+finalType :: Prog -> Type -> Type
+finalType p (TyVarType tv) = case Map.lookup tv (tyvarMap p) of
+  Nothing -> TyVarType tv
+  Just t -> finalType p t
+finalType p (TyDefType td params) = TyDefType td $ (finalType p) <$> params

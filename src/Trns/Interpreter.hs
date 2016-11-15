@@ -1,5 +1,5 @@
 module Trns.Interpreter (
-  Env,
+  Env (..),
   makeProgram,
   makeEnv,
   runCmd,
@@ -15,14 +15,20 @@ import Lang.Creators
 import Lang.CreateProg
 import Lang.Modifiers
 import Lang.Accessors
+import Control.Monad.State
 
 makeProgram = createProg
-makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath }
+makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath
+              , idNames = empty }
 
-newtype Env = Env { expNames :: Map ExpName ExpPath }
+data Env = Env { expNames :: Map ExpName ExpPath
+               , idNames  :: Map IdName  Id }
 
 bindExpName :: Env -> ExpName -> ExpPath -> Env
 bindExpName e name path = e { expNames = insert name path $ expNames e }
+
+bindIdName :: Env -> IdName -> Id -> Env
+bindIdName e name ident = e { idNames = insert name ident $ idNames e }
 
 runScript :: Prog -> Env -> TrnsScript -> (Prog, Env)
 runScript prog env (TrnsScript []) = (prog, env)
@@ -34,38 +40,43 @@ runCmd :: Prog -> Env -> TrnsCmd -> (Prog, Env)
 runCmd p env (BndCmd scopeName (IdName idName) valName) =
   case lookup scopeName $ expNames env of
     Nothing -> error $ "No Exp named " ++ (show scopeName)
-    (Just path) -> case bind p idName path of
-      (newProg, Nothing) -> (newProg, env)
-      (newProg, (Just ident)) -> (
-        newProg,
-        bindExpName env valName $ appendExpPath path $
-                                    BindingExpPath ident RootExpPath )
+    (Just path) ->
+      let (mi, newProg) = runState (bind idName path) p
+      in case mi of
+        Nothing -> (newProg, env)
+        Just ident -> ( newProg,
+                        bindIdName (
+                          bindExpName env valName $ appendExpPath path $
+                            BindingExpPath ident RootExpPath)
+                          (IdName idName) ident )
 runCmd p env (RplCmd expName expCreator) =
   case lookup expName $ expNames env of
     Nothing -> error $ "No Exp named " ++ (show expName)
     (Just path) ->
-      let expAndEnv = useCreator p path env expCreator
-          newExp = fst expAndEnv
-          newEnv = snd expAndEnv
-      in (replace p path newExp, newEnv)
+      let ((newExp, newEnv), newProg) =
+            runState (useCreator path env expCreator) p
+      in (replace newProg path newExp, newEnv)
 
-useCreator :: Prog -> ExpPath -> Env -> ExpCreator -> (Exp, Env)
-useCreator _ _ env CrUnit = (createUnit, env)
-useCreator _ _ env (CrNum x) = (createNum x, env)
-useCreator _ path env (CrLambda (IdName idName) expName) = (
-    createLambda idName,
+useCreator :: ExpPath -> Env -> ExpCreator -> State Prog (Exp, Env)
+useCreator _ env CrUnit = createUnit >>= \e -> return (e, env)
+useCreator _ env (CrNum x) = createNum x >>= \e -> return (e, env)
+useCreator path env (CrLambda (IdName idName) expName) =
+  createLambda idName >>= \e -> return (
+    e,
     bindExpName env expName $
       appendExpPath path $ ChildExpPath LambdaBodyIndex endExpPath
   )
-useCreator _ path env (CrApp funcName argName) = (
-    createApp,
+useCreator path env (CrApp funcName argName) =
+  createApp >>= \e -> return (
+    e,
     let e1 = bindExpName env funcName $
               appendExpPath path $ ChildExpPath AppFuncIndex endExpPath
     in bindExpName e1 argName $
         appendExpPath path $ ChildExpPath AppArgIndex endExpPath
   )
-useCreator _ path env (CrIf cName tName eName) = (
-    createIf,
+useCreator path env (CrIf cName tName eName) =
+  createIf >>= \e -> return (
+    e,
     let e1 = bindExpName env cName $
               appendExpPath path $ ChildExpPath IfCondIndex endExpPath
         e2 = bindExpName e1 tName $
@@ -73,11 +84,12 @@ useCreator _ path env (CrIf cName tName eName) = (
     in bindExpName e2 eName $
         appendExpPath path $ ChildExpPath IfElseIndex endExpPath
   )
-useCreator prog path env (CrIdExp (IdName idName)) =
+useCreator path env (CrIdExp (IdName idName)) = do
+  prog <- get
   case findIdFromPath prog idName path of
     Nothing ->
       -- TODO think about this, can't make even odd nested let example with
       --      this error. potential solution: rpl without removing bindings?
-      -- error $ "No identifier named $" ++ idName ++ " in scope"
-      (createIdExp (Id idName NoType), env)
-    Just ident -> (createIdExp ident, env)
+      error $ "No identifier named $" ++ idName ++ " in scope"
+      -- createIdExp (Id idName NoType) >>= \e -> return (e, env)
+    Just ident -> createIdExp ident >>= \e -> return (e, env)

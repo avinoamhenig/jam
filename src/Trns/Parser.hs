@@ -75,7 +75,7 @@ pNum =    do string "Num("
              num <- many1 digit
              maybeSpaces
              char ')'
-             return $ CrNum $ toInteger $ read num
+             return $ CrNum $ read num
 pLambda = do string "Lambda("
              maybeSpaces
              argName <- pIdName
