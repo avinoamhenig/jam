@@ -18,23 +18,30 @@ import Lang.BasisTypes
 b2 f = ExpVal $ BuiltInExp (\x -> BuiltInExp $ f x)
 
 basisIds = fromList [
-    ( "False"      , Id "False" tBool       ),
-    ( "True"       , Id "True"  tBool       ),
+    ( "False"      , Id "False" tBoolCon    ),
+    ( "True"       , Id "True"  tBoolCon    ),
     -- ( "Bool.Decon" , Id "Bool.Decon" NoType ),
-    ( "="          , Id "=" tBinNum         ),
+    ( "="          , Id "=" tBinNumCmp      ),
     ( "+"          , Id "+" tBinNum         ),
     ( "-"          , Id "-" tBinNum         ),
     ( "*"          , Id "*" tBinNum         ),
     ( "/"          , Id "/" tBinNum         ),
     ( "%"          , Id "%" tBinNum         ),
-    ( "<"          , Id "<" tBinNum         )
+    ( "<"          , Id "<" tBinNumCmp      )
   ]
 
 tBool = TyDefType boolType []
+tBoolCon = TyDefType functionType [
+  TyDefType unitType [],
+  tBool ]
 tBinNum = TyDefType functionType [
   TyDefType numberType [],
   TyDefType functionType [ TyDefType numberType [],
                            TyDefType numberType [] ] ]
+tBinNumCmp = TyDefType functionType [
+  TyDefType numberType [],
+  TyDefType functionType [ TyDefType numberType [],
+                           tBool ] ]
 
 true = AppExp { func = createIdExp' (basisIds ! "True")
               , argVal = createUnit'

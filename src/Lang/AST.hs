@@ -46,23 +46,31 @@ data TyVar = TyVar Unique deriving (Ord, Eq)
 instance Show TyVar where show (TyVar u) = "@" ++ (show u)
 
 type Arity = Int
-data TyDef = TyDef String Arity [TyCon] deriving (Eq)
+data TyDef = TyDef String Arity [TyCon]
 instance Show TyDef where show (TyDef name _ _) = name
+instance Eq TyDef where (TyDef n1 _ _) == (TyDef n2 _ _) = n1 == n2
 
-data TyCon = TyCon Type deriving (Eq)
+data TyCon = TyCon Type
 
 data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
-          deriving (Eq)
 instance Show Type where
   show (TyVarType tv) = show tv
   show (TyDefType td params)
     | show td == "->" =
-        "(" ++ (show $ params !! 0) ++ " -> " ++ (show $ params !! 1) ++ ")"
-    | otherwise = "("
+        let rt = if isFnType (params !! 1)
+                 then deparen (show $ params !! 1)
+                 else show $ params !! 1
+        in "(" ++ (show $ params !! 0) ++ " -> " ++ rt ++ ")"
+    | length params > 0 = "("
                ++ (show td) ++ " "
                ++ unwords (show <$> params)
                ++ ")"
+    | otherwise = show td
+
+isFnType :: Type -> Bool
+isFnType (TyDefType td _) = (show td) == "->"
+isFnType _ = False
 
 data Exp = BottomExp { typeof :: Type
                      , bindings :: Bindings

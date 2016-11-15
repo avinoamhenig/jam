@@ -9,7 +9,8 @@ module Lang.Accessors (
   constructors,
   findIdFromPath,
   findRootId,
-  finalType
+  finalType,
+  arity
 ) where
 
 import Prelude hiding (lookup)
@@ -18,6 +19,7 @@ import qualified Data.Map as Map
 import Lang.AST
 
 constructors (TyDef _ _ cs) = cs
+arity (TyDef _ a _) = a
 
 data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
