@@ -88,8 +88,5 @@ useCreator path env (CrIdExp (IdName idName)) = do
   prog <- get
   case findIdFromPath prog idName path of
     Nothing ->
-      -- TODO think about this, can't make even odd nested let example with
-      --      this error. potential solution: rpl without removing bindings?
       error $ "No identifier named $" ++ idName ++ " in scope"
-      -- createIdExp (Id idName NoType) >>= \e -> return (e, env)
     Just ident -> createIdExp ident >>= \e -> return (e, env)

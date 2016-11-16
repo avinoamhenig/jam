@@ -20,7 +20,6 @@ b2 f = ExpVal $ BuiltInExp (\x -> BuiltInExp $ f x)
 basisIds = fromList [
     ( "False"      , Id "False" tBoolCon    ),
     ( "True"       , Id "True"  tBoolCon    ),
-    -- ( "Bool.Decon" , Id "Bool.Decon" NoType ),
     ( "="          , Id "=" tBinNumCmp      ),
     ( "+"          , Id "+" tBinNum         ),
     ( "-"          , Id "-" tBinNum         ),
