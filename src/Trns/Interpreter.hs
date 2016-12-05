@@ -12,12 +12,12 @@ import Data.Map
 import Lang.AST
 import Trns.AST
 import Lang.Creators
-import Lang.CreateProg
 import Lang.Modifiers
 import Lang.Accessors
+import Lang.Basis
 import Control.Monad.State
 
-makeProgram = createProg
+makeProgram = basisProg
 makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath
               , idNames = empty }
 
@@ -56,6 +56,7 @@ runCmd p env (RplCmd expName expCreator) =
       let ((newExp, newEnv), newProg) =
             runState (useCreator path env expCreator) p
       in (replace newProg path newExp, newEnv)
+runCmd _ _ (TypCmd _ _ _) = error "Can't run typ command yet"
 
 useCreator :: ExpPath -> Env -> ExpCreator -> State Prog (Exp, Env)
 useCreator _ env CrUnit = createUnit >>= \e -> return (e, env)
@@ -63,8 +64,9 @@ useCreator _ env (CrNum x) = createNum x >>= \e -> return (e, env)
 useCreator path env (CrLambda (IdName idName) expName) =
   createLambda idName >>= \e -> return (
     e,
-    bindExpName env expName $
-      appendExpPath path $ ChildExpPath LambdaBodyIndex endExpPath
+    bindIdName (bindExpName env expName $
+                 appendExpPath path $ ChildExpPath LambdaBodyIndex endExpPath)
+               (IdName idName) (argId e)
   )
 useCreator path env (CrApp funcName argName) =
   createApp >>= \e -> return (
@@ -84,9 +86,9 @@ useCreator path env (CrIf cName tName eName) =
     in bindExpName e2 eName $
         appendExpPath path $ ChildExpPath IfElseIndex endExpPath
   )
-useCreator path env (CrIdExp (IdName idName)) = do
-  prog <- get
-  case findIdFromPath prog idName path of
-    Nothing ->
-      error $ "No identifier named $" ++ idName ++ " in scope"
+useCreator _ env (CrIdExp idName@(IdName name)) = do
+  case lookup idName (idNames env) of
+    Nothing -> case lookup name basisIds of
+      Nothing -> error $ "No identifier named $" ++ name ++ " in scope"
+      Just ident -> createIdExp ident >>= \e -> return (e, env)
     Just ident -> createIdExp ident >>= \e -> return (e, env)

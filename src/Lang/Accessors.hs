@@ -18,8 +18,8 @@ import Util.IndexedMap
 import qualified Data.Map as Map
 import Lang.AST
 
-constructors (TyDef _ _ cs) = cs
-arity (TyDef _ a _) = a
+constructors (TyDef _ _ _ cs) = cs
+arity (TyDef _ _ a _) = a
 
 data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
@@ -78,32 +78,32 @@ subExpAtPath e (ChildExpPath index path) =
     Nothing -> Nothing
     (Just sub) -> subExpAtPath sub path
 
-getArgName :: Exp -> Maybe String
-getArgName (LambdaExp { argId = (Id name _)}) = Just name
-getArgName _ = Nothing
+getArgU :: Exp -> Maybe Unique
+getArgU (LambdaExp { argId = (Id u _ _)}) = Just u
+getArgU _ = Nothing
 
-findIdFromPath :: Prog -> String -> ExpPath -> Maybe Id
-findIdFromPath prog idName path =
+findIdFromPath :: Prog -> Unique -> ExpPath -> Maybe Id
+findIdFromPath prog idU path =
   case expAtPath prog path of
     Nothing -> Nothing
     Just e ->
-      if (getArgName e) == Just idName
+      if (getArgU e) == Just idU
         then Just $ argId e
-        else case foldWithKey (_foldIdHelper idName) Nothing $ bindings e of
+        else case foldWithKey (_foldIdHelper idU) Nothing $ bindings e of
           Nothing -> case path of
-            RootExpPath            -> findRootId prog idName
-            RootBindingExpPath _ _ -> findRootId prog idName
-            _ -> findIdFromPath prog idName $ parentExpPath path
+            RootExpPath            -> findRootId prog idU
+            RootBindingExpPath _ _ -> findRootId prog idU
+            _ -> findIdFromPath prog idU $ parentExpPath path
           Just ident -> Just ident
 
 _foldIdHelper _ _ _ (Just ident) = Just ident
-_foldIdHelper idName ident@(Id name _) _ _
-  | name == idName = Just ident
+_foldIdHelper idU ident@(Id u _ _) _ _
+  | u == idU = Just ident
   | otherwise = Nothing
 
-findRootId :: Prog -> String -> Maybe Id
-findRootId prog idName =
-  foldWithKey (_foldIdHelper idName) Nothing $ rootBindings prog
+findRootId :: Prog -> Unique -> Maybe Id
+findRootId prog idU =
+  foldWithKey (_foldIdHelper idU) Nothing $ rootBindings prog
 
 childExp LambdaBodyIndex e@(LambdaExp {}) = Just $ body e
 childExp AppFuncIndex e@(AppExp {}) = Just $ func e

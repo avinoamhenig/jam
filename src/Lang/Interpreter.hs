@@ -5,6 +5,7 @@ module Lang.Interpreter (
 import Prelude hiding (lookup)
 import Lang.AST
 import Lang.Basis
+import Lang.BuiltIns
 import qualified Util.IndexedMap as IM
 import Data.Map
 
@@ -55,7 +56,7 @@ evalExp environment prog e =
                     _ -> e { bindings = IM.empty }
 
     IfExp {} -> let cond = evalExp env prog $ condExp e
-                in if (ident $ func cond) == (basisIds IM.! "True")
+                in if (ident $ func cond) == (basisIds ! "True")
                     then evalExp env prog $ thenExp e
                     else evalExp env prog $ elseExp e
 
@@ -72,7 +73,6 @@ evalExp environment prog e =
             case capturedEnv f of
               Nothing -> error "Evaluated lambda has no captured environment!"
               Just ce ->
-                -- evalExp (mergeEnv env $ extendEnv ce (argId f) $ ExpVal x)
                 evalExp (extendEnv ce (argId f) $ ExpVal x)
                         prog
                         (body f)
@@ -91,6 +91,10 @@ evalExp environment prog e =
                   _ -> error "Trying to apply non-applicable expression: " $
                         show f
           _ -> error "Trying to apply non-applicable expression: " $ show f
+
+    BuiltInRef ref -> case lookup ref builtInFuncs of
+                        Nothing -> error $ "Invalid built-in " ++ ref
+                        Just e -> e
 
     -- Atoms
     BuiltInExp _ -> e

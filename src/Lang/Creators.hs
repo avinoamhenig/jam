@@ -9,7 +9,7 @@ module Lang.Creators (
 
 import Util.IndexedMap
 import Lang.AST
-import Lang.BasisTypes
+import Lang.Basis
 import Control.Monad.State
 
 _btm t = BottomExp { bindings = empty, typeof = t }
@@ -33,9 +33,10 @@ createNum' x = NumExp { value = x
 
 createLambda :: String -> State Prog Exp
 createLambda argName = do
+  u <- getUnique
   t1 <- (TyVarType . TyVar) <$> getUnique
   t2 <- (TyVarType . TyVar) <$> getUnique
-  return $ LambdaExp { argId = Id argName t1
+  return $ LambdaExp { argId = Id u argName t1
                      , body  = _btm t2
                      , bindings = empty
                      , typeof = TyDefType functionType [t1, t2]
@@ -46,10 +47,10 @@ createIdExp :: Id -> State Prog Exp
 createIdExp i = return $ createIdExp' i
 
 createIdExp' :: Id -> Exp
-createIdExp' i@(Id _ t) = IdExp { ident = i
-                                , bindings = empty
-                                , typeof = t
-                                }
+createIdExp' i@(Id _ _ t) = IdExp { ident = i
+                                  , bindings = empty
+                                  , typeof = t
+                                  }
 
 createApp :: State Prog Exp
 createApp = do

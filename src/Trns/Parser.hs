@@ -6,6 +6,7 @@ module Trns.Parser (
 import Trns.AST
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad.Except
+import Text.ParserCombinators.Parsec.Char (letter)
 
 readTrnsScript :: String -> Either ParseError TrnsScript
 readTrnsScript input =
@@ -22,7 +23,7 @@ readTrnsCmd input =
     Right val -> return val
 
 pTrnsCmd :: Parser TrnsCmd
-pTrnsCmd = pBndCmd <|> pRplCmd
+pTrnsCmd = pBndCmd <|> pRplCmd <|> pTypCmd
 
 pBndCmd :: Parser TrnsCmd
 pBndCmd = do
@@ -46,17 +47,40 @@ pRplCmd = do
   maybeSpaces
   return $ RplCmd replace replaceWith
 
-pName :: Char -> (String -> a) -> Parser a
-pName prefix constructor = do
+pTypCmd :: Parser TrnsCmd
+pTypCmd = do
+  string "typ"
+  spaces
+  tyDefName <- pTyDefName
+  spaces
+  tyVarNames <- pTyVarName `sepEndBy` spaces
+  char '='
+  maybeSpaces
+  consDefs <- pConsDef `sepBy1` (char '|' >> maybeSpaces)
+  return $ TypCmd tyDefName tyVarNames consDefs
+
+pName :: Parser String
+pName = many $ noneOf " \t\n()"
+
+pTyVarName :: Parser String
+pTyVarName = do c <- letter
+                s <- many alphaNum
+                return $ c:s
+
+pPrefixedName :: Char -> (String -> a) -> Parser a
+pPrefixedName prefix constructor = do
   char prefix
-  name <- many $ noneOf " \t\n()"
+  name <- pName
   return $ constructor name
 
 pExpName :: Parser ExpName
-pExpName = pName ':' ExpName
+pExpName = pPrefixedName ':' ExpName
 
 pIdName :: Parser IdName
-pIdName = pName '$' IdName
+pIdName = pPrefixedName '$' IdName
+
+pTyDefName :: Parser TyDefName
+pTyDefName = pPrefixedName '#' TyDefName
 
 pExpCreator :: Parser ExpCreator
 pExpCreator =  try pUnit
@@ -108,6 +132,29 @@ pIf =     do string "If("
              maybeSpaces
              char ')'
              return $ CrIf c t e
+
+pConsDef :: Parser ConsDef
+pConsDef = do
+  idName <- pIdName
+  maybeSpaces
+  typeDescs <- pTypeDesc `sepEndBy` spaces
+  return $ ConsDef idName typeDescs
+
+pTypeDesc :: Parser TypeDesc
+pTypeDesc = pTypeDefTypeDesc <|> pTypeVarTypeDesc
+  where pTypeVarTypeDesc = pTyVarName >>=
+                            (\tvn -> return $ TyVarTypeDesc tvn)
+        pTypeDefTypeDesc = (pTyDefName >>=
+                              (\tdn -> return $ TyDefTypeDesc tdn []))
+                        <|> do
+                          char '('
+                          maybeSpaces
+                          tyDefName <- pTyDefName
+                          spaces
+                          tyDescs <- pTypeDesc `sepBy` spaces
+                          maybeSpaces
+                          char ')'
+                          return $ TyDefTypeDesc tyDefName tyDescs
 
 spaces :: Parser ()
 spaces = skipMany1 $ oneOf " \t"

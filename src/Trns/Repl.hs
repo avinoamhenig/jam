@@ -8,6 +8,7 @@ import Trns.AST
 import Trns.Interpreter
 import Lang.Interpreter
 import Lang.Accessors
+import Lang.Basis
 import Data.Map
 import Prelude hiding (lookup)
 
@@ -35,10 +36,10 @@ doCommand prog env (cmd:args)
         t = if prefix /= ':'
             then let iname = if prefix == '$' then name else prefix:name
                  in case lookup (IdName iname) (idNames env) of
-                      Nothing -> case findRootId prog iname of
+                      Nothing -> case lookup iname basisIds of
                         Nothing -> Nothing
-                        Just (Id _ t) -> Just t
-                      Just (Id _ t) -> Just t
+                        Just (Id _ _ t) -> Just t
+                      Just (Id _ _ t) -> Just t
             else let ename = ExpName name
                  in case lookup ename (expNames env) of
                       Nothing -> Nothing
@@ -67,6 +68,9 @@ runLine code prog env = case readTrnsCmd code of
                           Left e -> do putStr $ (show e) ++ "\n\n"
                                        return $ (prog, env)
                           Right cmd -> return $ runCmd prog env cmd
+                          -- Uncomment below to just print parsed cmd
+                          -- Right cmd -> do putStr $ (show cmd) ++ "\n\n"
+                                          -- return $ (prog, env)
 
 runFile :: FilePath -> Prog -> Env -> IO (Prog, Env)
 runFile file prog env = do

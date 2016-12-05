@@ -10,7 +10,8 @@ module Lang.AST (
   Arity,
   Bindings,
   getUnique,
-  deparen
+  deparen,
+  Unique
 ) where
 
 import qualified Util.IndexedMap
@@ -37,20 +38,20 @@ data BindingVal = ExpVal Exp
                 | TyConVal TyCon
                 | TyDefDeconVal TyDef
 
-data Id = Id String Type
-instance Show Id where show (Id name _) = name
-instance Eq Id where (Id s1 _) == (Id s2 _) = s1 == s2
-instance Ord Id where (Id s1 _) `compare` (Id s2 _) = s1 `compare` s2
+data Id = Id Unique String Type
+instance Show Id where show (Id _ name _) = name
+instance Eq Id where (Id u1 _ _) == (Id u2 _ _) = u1 == u2
+instance Ord Id where (Id u1 _ _) `compare` (Id u2 _ _) = u1 `compare` u2
 
 data TyVar = TyVar Unique deriving (Ord, Eq)
 instance Show TyVar where show (TyVar u) = "@" ++ (show u)
 
 type Arity = Int
-data TyDef = TyDef String Arity [TyCon]
-instance Show TyDef where show (TyDef name _ _) = name
-instance Eq TyDef where (TyDef n1 _ _) == (TyDef n2 _ _) = n1 == n2
+data TyDef = TyDef Unique String Arity [TyCon]
+instance Show TyDef where show (TyDef _ name _ _) = name
+instance Eq TyDef where (TyDef u1 _ _ _) == (TyDef u2 _ _ _) = u1 == u2
 
-data TyCon = TyCon Type
+data TyCon = TyCon Unique String Type
 
 data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
@@ -72,38 +73,39 @@ isFnType :: Type -> Bool
 isFnType (TyDefType td _) = (show td) == "->"
 isFnType _ = False
 
-data Exp = BottomExp { typeof :: Type
+data Exp = BuiltInExp (Exp -> Exp)
+         | BuiltInRef String
+         | BottomExp { typeof :: Type
                      , bindings :: Bindings
                      }
-         | UnitExp { typeof :: Type
-                   , bindings :: Bindings
-                   }
-         | NumExp { value :: Int
-                  , typeof :: Type
-                  , bindings :: Bindings
-                  }
-         | BuiltInExp (Exp -> Exp)
-         | IdExp { ident :: Id
-                 , bindings :: Bindings
-                 , typeof :: Type
-                 }
+         | UnitExp   { typeof :: Type
+                     , bindings :: Bindings
+                     }
+         | NumExp    { value :: Int
+                     , typeof :: Type
+                     , bindings :: Bindings
+                     }
+         | IdExp     { ident :: Id
+                     , bindings :: Bindings
+                     , typeof :: Type
+                     }
          | LambdaExp { argId :: Id
                      , body :: Exp
                      , bindings :: Bindings
                      , typeof :: Type
                      , capturedEnv :: Maybe (Map Id BindingVal)
                      }
-         | AppExp { func :: Exp
-                  , argVal :: Exp
-                  , typeof :: Type
-                  , bindings :: Bindings
-                  }
-         | IfExp { condExp :: Exp
-                 , thenExp :: Exp
-                 , elseExp :: Exp
-                 , typeof :: Type
-                 , bindings :: Bindings
-                 }
+         | AppExp    { func :: Exp
+                     , argVal :: Exp
+                     , typeof :: Type
+                     , bindings :: Bindings
+                     }
+         | IfExp     { condExp :: Exp
+                     , thenExp :: Exp
+                     , elseExp :: Exp
+                     , typeof :: Type
+                     , bindings :: Bindings
+                     }
 
 deparen s
   | (s !! 0) == '(' && length s > 2 = (take ((length s) - 2) . drop 1) s
@@ -111,7 +113,7 @@ deparen s
 _wrapLet e s =
   let bindingStrs =
         Util.IndexedMap.foldWithKey
-          (\(Id name _) val acc -> case val of
+          (\(Id _ name _) val acc -> case val of
             ExpVal ev -> ("(" ++ name ++ " = "
                               ++ (deparen $ show ev) ++ ")") : acc
             _ -> acc )
@@ -124,6 +126,7 @@ instance Show Exp where
   show e@(BottomExp {}) = _wrapLet e $ "_"
   show e@(UnitExp {}) = _wrapLet e $ "()"
   show e@(NumExp { value = val }) = _wrapLet e (show val)
+  show e@(BuiltInRef n) = _wrapLet e $ "<Built-in " ++ n ++ ">"
   show e@(BuiltInExp _) = _wrapLet e $ "<Built-in>"
   show e@(IdExp { ident = ident }) = _wrapLet e $ show ident
   show e@(LambdaExp {}) = _wrapLet e $  "(\\" ++ (show $ argId e)

@@ -20,8 +20,9 @@ bind idName scopePath = do
   case expAtPath prog scopePath of
     Nothing -> return Nothing
     Just e -> do t <- (TyVarType . TyVar) <$> getUnique
+                 u <- getUnique
+                 let ident = Id u idName t
                  prog <- get
-                 let ident = Id idName t
                  put $ replace prog scopePath $
                          _bind ident (ExpVal $ BottomExp t empty) e
                  return $ Just ident
