@@ -3,6 +3,7 @@ module Trns.AST (
   ExpName (..),
   TyDefName (..),
   TyVarName,
+  TyDefDesc (..),
   TypeDesc (..),
   ConsDef (..),
   ExpCreator (..),
@@ -26,7 +27,9 @@ data ExpCreator = CrUnit
 
 data TrnsCmd = BndCmd ExpName IdName ExpName -- BndCmd scope idName valName
              | RplCmd ExpName ExpCreator
-             | TypCmd TyDefName [TyVarName] [ConsDef]
+             | TypCmd [TyDefDesc]
+
+data TyDefDesc = TyDefDesc TyDefName [TyVarName] [ConsDef]
 
 data TypeDesc = TyVarTypeDesc TyVarName
               | TyDefTypeDesc TyDefName [TypeDesc]
@@ -50,9 +53,13 @@ instance Show TrnsCmd where
   show (BndCmd a b c) =
     "bnd " ++ (show a) ++ " " ++ (show b) ++ " " ++ (show c)
   show (RplCmd a b)   = "rpl " ++ (show a) ++ " " ++ (show b)
-  show (TypCmd tdn tvns cds) =
-    "typ " ++ (show tdn) ++ " " ++ (concat $ map (++ " ") tvns) ++ "= "
-           ++ (intercalate " | " $ map show cds)
+  show (TypCmd tds) = "typ " ++ (intercalate "  &  " $ map show tds)
+
+instance Show TyDefDesc where
+  show (TyDefDesc tdn tvns cds) =
+    (show tdn) ++ " " ++ (concat $ map (++ " ") tvns) ++ "= "
+               ++ (intercalate " | " $ map show cds)
+
 instance Show ConsDef where
   show (ConsDef idn tds) = (show idn) ++ (concat $ map ((" " ++) . show) tds)
 instance Show TypeDesc where

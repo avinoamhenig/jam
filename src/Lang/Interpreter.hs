@@ -90,6 +90,11 @@ evalExp environment prog e =
                   TyDefDeconVal _ -> error "Decon not implemented yet"
                   _ -> error "Trying to apply non-applicable expression: " $
                         show f
+          AppExp { typeof = t } -> AppExp { func = f
+                                          , argVal = x
+                                          , typeof = t
+                                          , bindings = IM.empty
+                                          }
           _ -> error "Trying to apply non-applicable expression: " $ show f
 
     BuiltInRef ref -> case lookup ref builtInFuncs of

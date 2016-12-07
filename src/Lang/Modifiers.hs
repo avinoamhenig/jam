@@ -1,6 +1,7 @@
 module Lang.Modifiers (
   replace,
   bind,
+  addTyDef,
   unify
 ) where
 
@@ -8,7 +9,7 @@ import Prelude hiding (lookup)
 import Lang.AST
 import Lang.Accessors
 import Util.IndexedMap
-import qualified Data.Map as Map
+import qualified Data.Map as M
 import Control.Monad.State
 
 _bind :: Id -> BindingVal -> Exp -> Exp
@@ -27,6 +28,9 @@ bind idName scopePath = do
                          _bind ident (ExpVal $ BottomExp t empty) e
                  return $ Just ident
 
+addTyDef :: Prog -> TyDef -> Prog
+addTyDef p td = p { tydefs = td:(tydefs p) }
+
 _replaceSubExp :: Exp -> ExpPath -> Exp -> Exp
 _replaceSubExp _ RootExpPath new = new
 _replaceSubExp orig (RootBindingExpPath _ _) _ = orig
@@ -43,13 +47,47 @@ _replaceSubExp orig (ChildExpPath index path) new =
       Nothing -> orig
       Just setter -> setter $ _replaceSubExp child path new
 
+
+copyType :: Type -> State Prog Type
+copyType ty = do (newT, _) <- _copyType ty M.empty
+                 return newT
+  where _copyType (TyVarType tv) tvMap =
+            case M.lookup tv tvMap of
+              Nothing -> do u <- getUnique
+                            let newT = TyVarType (TyVar u)
+                            return $ (newT, M.insert tv newT tvMap)
+              Just newT -> return $ (newT, tvMap)
+
+        _copyType (TyDefType td paramTs) tvMap = do
+            (newParamTs, newTvMap) <- copyParamTypes paramTs tvMap
+            return (TyDefType td newParamTs, newTvMap)
+        copyParamTypes [] tvMap = return ([], tvMap)
+        copyParamTypes (t:ts) tvMap = do
+          (newT , newTvMap) <- _copyType t tvMap
+          (newTs, newTvMap) <- copyParamTypes ts newTvMap
+          return (newT:newTs, newTvMap)
+
 replace :: Prog -> ExpPath -> Exp -> Prog
 replace p path r =
   case expAtPath p path of
     Nothing -> error "Replacing non-existent path"
     Just e ->
-      let (unifies, newProg) = runState (unify (typeof e) (typeof r)) p
-      in if unifies then _replace newProg path r
+      let parentPath = (parentExpPath path)
+          (newTy, newProg) =
+            case expAtPath p parentPath of
+              Just (AppExp {}) ->
+                if (appendExpPath parentPath
+                                  (ChildExpPath AppFuncIndex RootExpPath))
+                      == path
+                then case r of
+                       IdExp { typeof = ty } -> runState (copyType ty) p
+                       _ -> (typeof r, p)
+                else (typeof r, p)
+              _ -> (typeof r, p)
+          _r = r { typeof = newTy }
+          (unifies, newestProg) =
+            runState (unify (typeof e) (typeof _r)) newProg
+      in if unifies then _replace newestProg path _r
                     else error "Types don't match"
   where
     _replace p (RootBindingExpPath i path) new = p {
@@ -71,12 +109,12 @@ unify t1 t2 = do p <- get
     _unify (TyVarType tv1) (TyVarType tv2) = do
       t3 <- (TyVarType . TyVar) <$> getUnique
       p <- get
-      put $ p { tyvarMap = Map.insert tv1 t3 $
-                            Map.insert tv2 t3 $ tyvarMap p }
+      put $ p { tyvarMap = M.insert tv1 t3 $
+                            M.insert tv2 t3 $ tyvarMap p }
       return True
     _unify (TyVarType tv) t2 = do
       p <- get
-      put $ p { tyvarMap = Map.insert tv t2 $ tyvarMap p }
+      put $ p { tyvarMap = M.insert tv t2 $ tyvarMap p }
       return True
     _unify t2 t1@(TyVarType _) = _unify t1 t2
     _unify (TyDefType td1 ps1) (TyDefType td2 ps2) =

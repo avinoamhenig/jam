@@ -10,6 +10,7 @@ module Lang.AST (
   Arity,
   Bindings,
   getUnique,
+  getUniques,
   deparen,
   Unique
 ) where
@@ -33,6 +34,12 @@ getUnique = do p <- get
                let u = uniqC p
                put p { uniqC = u + 1 }
                return u
+
+getUniques :: Int -> State Prog [Unique]
+getUniques 0 = return []
+getUniques n = do u <- getUnique
+                  us <- getUniques (n-1)
+                  return (u:us)
 
 data BindingVal = ExpVal Exp
                 | TyConVal TyCon

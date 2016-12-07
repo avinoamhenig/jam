@@ -25,6 +25,7 @@ data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
              | BindingExpPath Id ExpPath
              | ChildExpPath ChildExpIndex ExpPath
+             deriving Eq
 endExpPath = RootExpPath
 
 data ChildExpIndex = LambdaBodyIndex
@@ -33,6 +34,7 @@ data ChildExpIndex = LambdaBodyIndex
                    | IfCondIndex
                    | IfThenIndex
                    | IfElseIndex
+                   deriving Eq
 
 appendExpPath :: ExpPath -> ExpPath -> ExpPath
 appendExpPath RootExpPath p2 = p2

@@ -48,8 +48,12 @@ pRplCmd = do
   return $ RplCmd replace replaceWith
 
 pTypCmd :: Parser TrnsCmd
-pTypCmd = do
-  string "typ"
+pTypCmd = do string "typ"
+             tyDefDescs <- pTyDefDesc `sepBy1` (char '&')
+             return $ TypCmd tyDefDescs
+
+pTyDefDesc :: Parser TyDefDesc
+pTyDefDesc = do
   spaces
   tyDefName <- pTyDefName
   spaces
@@ -57,7 +61,7 @@ pTypCmd = do
   char '='
   maybeSpaces
   consDefs <- pConsDef `sepBy1` (char '|' >> maybeSpaces)
-  return $ TypCmd tyDefName tyVarNames consDefs
+  return $ TyDefDesc tyDefName tyVarNames consDefs
 
 pName :: Parser String
 pName = many $ noneOf " \t\n()"

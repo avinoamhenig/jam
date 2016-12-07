@@ -7,7 +7,8 @@ module Trns.Interpreter (
 ) where
 
 import Prelude hiding (lookup)
-import Data.Map
+import Data.Map hiding (map)
+import qualified Util.IndexedMap as IM
 
 import Lang.AST
 import Trns.AST
@@ -19,16 +20,21 @@ import Control.Monad.State
 
 makeProgram = basisProg
 makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath
-              , idNames = empty }
+              , idNames = empty
+              , tyDefNames = empty }
 
-data Env = Env { expNames :: Map ExpName ExpPath
-               , idNames  :: Map IdName  Id }
+data Env = Env { expNames   :: Map ExpName   ExpPath
+               , idNames    :: Map IdName    Id
+               , tyDefNames :: Map TyDefName TyDef}
 
 bindExpName :: Env -> ExpName -> ExpPath -> Env
 bindExpName e name path = e { expNames = insert name path $ expNames e }
 
 bindIdName :: Env -> IdName -> Id -> Env
 bindIdName e name ident = e { idNames = insert name ident $ idNames e }
+
+bindTyDefName :: Env -> TyDefName -> TyDef -> Env
+bindTyDefName e n tydef = e { tyDefNames = insert n tydef $ tyDefNames e }
 
 runScript :: Prog -> Env -> TrnsScript -> (Prog, Env)
 runScript prog env (TrnsScript []) = (prog, env)
@@ -56,7 +62,9 @@ runCmd p env (RplCmd expName expCreator) =
       let ((newExp, newEnv), newProg) =
             runState (useCreator path env expCreator) p
       in (replace newProg path newExp, newEnv)
-runCmd _ _ (TypCmd _ _ _) = error "Can't run typ command yet"
+runCmd p env (TypCmd tdds) =
+  let ((newEnv, _), newProg) = runState (typCmdToTyDefs env tdds) p
+  in (newProg, newEnv)
 
 useCreator :: ExpPath -> Env -> ExpCreator -> State Prog (Exp, Env)
 useCreator _ env CrUnit = createUnit >>= \e -> return (e, env)
@@ -92,3 +100,75 @@ useCreator _ env (CrIdExp idName@(IdName name)) = do
       Nothing -> error $ "No identifier named $" ++ name ++ " in scope"
       Just ident -> createIdExp ident >>= \e -> return (e, env)
     Just ident -> createIdExp ident >>= \e -> return (e, env)
+
+typCmdToTyDefs :: Env -> [TyDefDesc] -> State Prog (Env, [TyDef])
+typCmdToTyDefs env tdds = do
+  tdUs <- getUniques (length tdds)
+  let curTdMap = fromList $ map (\(u, (TyDefDesc tdn@(TyDefName n) _ _)) ->
+                                        (tdn, TyDef u n 0 []))
+                                (zip tdUs tdds)
+  tyDefs <- mapM (tyDefDescToTyDef env curTdMap)
+                        (zip tdUs tdds)
+  -- update tydefs
+  -- let recursiveTyDefs = _updateRecTyDefs tdUs recursiveTyDefs tyDefs
+
+  -- bind tycon identifiers
+  newEnv <- bindTyConIds tyDefs env
+  return (newEnv, tyDefs)
+
+bindTyConIds :: [TyDef] -> Env -> State Prog Env
+bindTyConIds [] env = return env
+bindTyConIds ((TyDef _ _ _ tcs):tds) env = do
+  newEnv <- bindTyConIds tds env
+  _bindTyconIds tcs newEnv
+  where _bindTyconIds (tc@(TyCon _ name ty):tcs) env = do
+          newEnv <- _bindTyconIds tcs env
+          u <- getUnique
+          p <- get
+          let tcId = Id u name ty
+          put $ p { rootBindings = IM.insert tcId (TyConVal tc)
+                                             (rootBindings p) }
+          return $ bindIdName newEnv (IdName name) tcId
+        _bindTyconIds [] env = return env
+
+tyDefDescToTyDef :: Env -> Map TyDefName TyDef -> (Unique, TyDefDesc)
+                        -> State Prog TyDef
+tyDefDescToTyDef env curTdMap
+                 (u, (TyDefDesc tdn@(TyDefName name) tvns cds)) =
+  do let arity = length tvns
+     tvUs <- getUniques arity
+     let tvs = map TyVar tvUs
+         tvMap = fromList $ zip tvns tvs
+         td = curTdMap ! tdn
+     tyCons <- mapM (consDefToTyCon env curTdMap tvMap td tvs) cds
+     return $ TyDef u name arity tyCons
+
+consDefToTyCon :: Env -> Map TyDefName TyDef
+                      -> Map TyVarName TyVar
+                      -> TyDef
+                      -> [TyVar]
+                      -> ConsDef
+                      -> State Prog TyCon
+consDefToTyCon env curTdMap tvMap td tvs (ConsDef (IdName idName) tDescs) = do
+  tcU <- getUnique
+  let types = map (tyDescToType env curTdMap tvMap) tDescs
+      tyCon = TyCon tcU idName (typesToFuncType types $
+                                 TyDefType td (map TyVarType tvs))
+  return tyCon
+
+tyDescToType :: Env -> Map TyDefName TyDef -> Map TyVarName TyVar -> TypeDesc
+                    -> Type
+tyDescToType _ _ tvMap (TyVarTypeDesc tvn) =
+  case lookup tvn tvMap of
+    Nothing -> error $ "No type variable " ++ tvn
+    Just tv -> TyVarType tv
+tyDescToType env curTdMap tvMap (TyDefTypeDesc tdn tds) =
+  case lookup tdn (tyDefNames env) of
+    Nothing -> case lookup tdn curTdMap of
+      Nothing -> error $ "No such type " ++ (show tdn)
+      Just td -> TyDefType td $ map (tyDescToType env curTdMap tvMap) tds
+    Just td -> TyDefType td $ map (tyDescToType env curTdMap tvMap) tds
+
+typesToFuncType :: [Type] -> Type -> Type
+typesToFuncType [] rt = rt
+typesToFuncType (t:ts) rt = TyDefType functionType [t, typesToFuncType ts rt]
