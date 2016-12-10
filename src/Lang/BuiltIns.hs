@@ -3,23 +3,14 @@ module Lang.BuiltIns (
 ) where
 
 import Data.Map
-import qualified Util.IndexedMap as IM
 import Lang.AST
 import Lang.Creators
 import Lang.Basis
 
 b2 f = BuiltInExp (\x -> BuiltInExp $ f x)
 
-true = AppExp { func = createIdExp' $ basisIds ! "True"
-              , argVal = createUnit'
-              , typeof = TyDefType boolType []
-              , bindings = IM.empty
-              }
-false = AppExp { func = createIdExp' $ basisIds ! "False"
-               , argVal = createUnit'
-               , typeof = TyDefType boolType []
-               , bindings = IM.empty
-               }
+true  = createIdExp' $ basisIds ! "True"
+false = createIdExp' $ basisIds ! "False"
 
 builtInFuncs = fromList [
     ("=", b2 (\x y -> if (value x) == (value y) then true else false )),

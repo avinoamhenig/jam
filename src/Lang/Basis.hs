@@ -67,8 +67,8 @@ makeBasis = do
   u2 <- getUnique
   u3 <- getUnique
   let _boolType = TyDef u1 "Bool" 0 [
-                    TyCon u2 "False" (tFun tUnit (TyDefType _boolType [])),
-                    TyCon u3 "True"  (tFun tUnit (TyDefType _boolType []))
+                    TyCon u2 "False" (TyDefType _boolType []),
+                    TyCon u3 "True"  (TyDefType _boolType [])
                   ]
       [_cFalse, _cTrue] = (constructors _boolType)
       tBool = TyDefType _boolType []

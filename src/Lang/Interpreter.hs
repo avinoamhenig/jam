@@ -56,9 +56,9 @@ evalExp environment prog e =
                     _ -> e { bindings = IM.empty }
 
     IfExp {} -> let cond = evalExp env prog $ condExp e
-                in if (ident $ func cond) == (basisIds ! "True")
-                    then evalExp env prog $ thenExp e
-                    else evalExp env prog $ elseExp e
+                in if (ident cond) == (basisIds ! "True")
+                   then evalExp env prog $ thenExp e
+                   else evalExp env prog $ elseExp e
 
     LambdaExp {} -> case capturedEnv e of
                       Nothing -> e { capturedEnv = Just env }

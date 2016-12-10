@@ -11,17 +11,23 @@ import Lang.Accessors
 import Lang.Basis
 import Data.Map
 import Prelude hiding (lookup)
+import System.Console.Readline
 
 main :: IO ()
 main = repl makeProgram makeEnv
 
 repl :: Prog -> Env -> IO ()
 repl prog env = do
-  putStr "-> "
-  line <- (liftM strip) getLine
-  when (take 1 line == ".") $ doCommand prog env $ words $ drop 1 line
-  progAndEnv <- runLine line prog env
-  printProgAndLoop progAndEnv
+  maybeLine <- readline "-> "
+  case maybeLine of
+    Nothing -> exitSuccess
+    Just _line ->
+      let line = strip _line
+      in do
+        addHistory line
+        when (take 1 line == ".") $ doCommand prog env $ words $ drop 1 line
+        progAndEnv <- runLine line prog env
+        printProgAndLoop progAndEnv
 
 doCommand :: Prog -> Env -> [String] -> IO ()
 doCommand prog env (cmd:args)

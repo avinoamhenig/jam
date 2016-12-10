@@ -33,9 +33,6 @@ bindExpName e name path = e { expNames = insert name path $ expNames e }
 bindIdName :: Env -> IdName -> Id -> Env
 bindIdName e name ident = e { idNames = insert name ident $ idNames e }
 
-bindTyDefName :: Env -> TyDefName -> TyDef -> Env
-bindTyDefName e n tydef = e { tyDefNames = insert n tydef $ tyDefNames e }
-
 runScript :: Prog -> Env -> TrnsScript -> (Prog, Env)
 runScript prog env (TrnsScript []) = (prog, env)
 runScript prog env (TrnsScript (cmd:rest)) =
