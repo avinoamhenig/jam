@@ -104,8 +104,7 @@ typCmdToTyDefs env tdds = do
   let curTdMap = fromList $ map (\(u, (TyDefDesc tdn@(TyDefName n) _ _)) ->
                                         (tdn, TyDef u n 0 []))
                                 (zip tdUs tdds)
-  tyDefs <- mapM (tyDefDescToTyDef env curTdMap)
-                        (zip tdUs tdds)
+  tyDefs <- mapM (tyDefDescToTyDef env curTdMap) (zip tdUs tdds)
   -- update tydefs
   -- let recursiveTyDefs = _updateRecTyDefs tdUs recursiveTyDefs tyDefs
 
@@ -115,8 +114,17 @@ typCmdToTyDefs env tdds = do
 
 bindTyConIds :: [TyDef] -> Env -> State Prog Env
 bindTyConIds [] env = return env
-bindTyConIds ((TyDef _ _ _ tcs):tds) env = do
-  newEnv <- bindTyConIds tds env
+bindTyConIds (td@(TyDef _ name _ tcs):tds) env = do
+  u1 <- getUnique
+  u2 <- getUnique
+  let deconT = deconType td (TyVar u1)
+      deconName = name ++ ".Decon"
+      deconId = Id u2 deconName deconT
+  p <- get
+  put $ p { rootBindings = IM.insert deconId (TyDefDeconVal td)
+                                             (rootBindings p) }
+  let env' = bindIdName env (IdName deconName) deconId
+  newEnv <- bindTyConIds tds env'
   _bindTyconIds tcs newEnv
   where _bindTyconIds (tc@(TyCon _ name ty):tcs) env = do
           newEnv <- _bindTyconIds tcs env
@@ -127,6 +135,33 @@ bindTyConIds ((TyDef _ _ _ tcs):tds) env = do
                                              (rootBindings p) }
           return $ bindIdName newEnv (IdName name) tcId
         _bindTyconIds [] env = return env
+
+deconType :: TyDef -> TyVar -> Type
+deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv =
+  TyDefType functionType [finalReturnType tcT, _deconClauseTypes tcs tv]
+  where _deconClauseTypes tcs tv =
+          typesToFuncType (map (\(TyCon _ _ t) ->
+                                  _wrapInFnTy $ conTyToDeconClauseType t tv)
+                               tcs)
+                          (TyVarType tv)
+        _wrapInFnTy t@(TyDefType td _) | td == functionType = t
+        _wrapInFnTy t = TyDefType functionType [(TyDefType unitType []), t]
+deconType _ _ = error "Type definition has no constructors"
+
+finalReturnType :: Type -> Type
+finalReturnType t@(TyDefType td paramTs)
+  | td == functionType = finalReturnType (paramTs !! 1)
+  | otherwise = t
+finalReturnType t = t
+
+conTyToDeconClauseType :: Type -> TyVar -> Type
+conTyToDeconClauseType (TyVarType _) _ = error "Something is wrong"
+conTyToDeconClauseType (TyDefType td paramTs) retTv
+  | td == functionType = TyDefType functionType [
+                            paramTs !! 0,
+                            conTyToDeconClauseType (paramTs !! 1) retTv
+                          ]
+  | otherwise = TyVarType retTv
 
 tyDefDescToTyDef :: Env -> Map TyDefName TyDef -> (Unique, TyDefDesc)
                         -> State Prog TyDef

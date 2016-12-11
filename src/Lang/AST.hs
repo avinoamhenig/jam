@@ -59,6 +59,7 @@ instance Show TyDef where show (TyDef _ name _ _) = name
 instance Eq TyDef where (TyDef u1 _ _ _) == (TyDef u2 _ _ _) = u1 == u2
 
 data TyCon = TyCon Unique String Type
+instance Eq TyCon where (TyCon u1 _ _) == (TyCon u2 _ _) = u1 == u2
 
 data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
