@@ -1,4 +1,4 @@
-module Lang.Accessors (
+module Jam.Accessors (
   ExpPath (..), endExpPath,
   ChildExpIndex (..),
   appendExpPath,
@@ -16,7 +16,7 @@ module Lang.Accessors (
 import Prelude hiding (lookup)
 import Util.IndexedMap
 import qualified Data.Map as Map
-import Lang.AST
+import Jam.Ast
 
 constructors (TyDef _ _ _ cs) = cs
 arity (TyDef _ _ a _) = a
@@ -25,7 +25,7 @@ data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
              | BindingExpPath Id ExpPath
              | ChildExpPath ChildExpIndex ExpPath
-             deriving Eq
+             deriving (Eq, Show)
 endExpPath = RootExpPath
 
 data ChildExpIndex = LambdaBodyIndex
@@ -34,7 +34,7 @@ data ChildExpIndex = LambdaBodyIndex
                    | IfCondIndex
                    | IfThenIndex
                    | IfElseIndex
-                   deriving Eq
+                   deriving (Eq, Show)
 
 appendExpPath :: ExpPath -> ExpPath -> ExpPath
 appendExpPath RootExpPath p2 = p2

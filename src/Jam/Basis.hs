@@ -1,4 +1,4 @@
-module Lang.Basis (
+module Jam.Basis (
   basisProg,
   basis,
   basisBindings,
@@ -15,8 +15,8 @@ module Lang.Basis (
 import qualified Util.IndexedMap as IM
 import qualified Data.Map as M
 import Control.Monad.State
-import Lang.AST
-import Lang.Accessors
+import Jam.Ast
+import Jam.Accessors
 
 basisProg     = snd basisAndProg
 basis         = fst basisAndProg

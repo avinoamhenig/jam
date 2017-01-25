@@ -1,0 +1,31 @@
+rpl :root App(:rf :ra)
+
+typ #List a = $Cons a (#List a) | $Nil
+
+bnd :root $mkLs :mkLs
+rpl :mkLs Lambda($n :body)
+
+rpl :body If(:c :t :e)
+
+rpl :c App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($=)
+rpl :a1 IdExp($n)
+rpl :a2 Num(0)
+
+rpl :t IdExp($Nil)
+
+rpl :e App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($n)
+rpl :a2 App(:f :a)
+rpl :f IdExp($mkLs)
+rpl :a App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($-)
+rpl :a1 IdExp($n)
+rpl :a2 Num(1)
+
+rpl :rf IdExp($mkLs)
+rpl :ra Num(5)

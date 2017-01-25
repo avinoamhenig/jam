@@ -1,11 +1,11 @@
-module Lang.BuiltIns (
+module Jam.BuiltIns (
   builtInFuncs
 ) where
 
 import Data.Map
-import Lang.AST
-import Lang.Creators
-import Lang.Basis
+import Jam.Ast
+import Jam.Creators
+import Jam.Basis
 
 b2 f = BuiltInExp (\x -> BuiltInExp $ f x)
 

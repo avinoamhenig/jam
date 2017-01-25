@@ -1,4 +1,4 @@
-module Lang.AST (
+module Jam.Ast (
   Prog (..),
   BindingVal (..),
   Id (..),

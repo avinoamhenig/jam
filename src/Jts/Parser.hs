@@ -1,31 +1,31 @@
-module Trns.Parser (
-  readTrnsScript,
-  readTrnsCmd
+module Jts.Parser (
+  readJtsScript,
+  readJtsCmd
 ) where
 
-import Trns.AST
+import Jts.Ast
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec.Char (letter)
 
-readTrnsScript :: String -> Either ParseError TrnsScript
-readTrnsScript input =
-  case parse parseScript "TrnsScript" input of
+readJtsScript :: String -> Either ParseError JtsScript
+readJtsScript input =
+  case parse parseScript "JtsScript" input of
     Left err -> throwError err
-    Right val -> return $ TrnsScript val
+    Right val -> return $ JtsScript val
   where parseScript = do skipMany emptyline
-                         pTrnsCmd `sepEndBy` (many1 emptyline)
+                         pJtsCmd `sepEndBy` (many1 emptyline)
 
-readTrnsCmd :: String -> Either ParseError TrnsCmd
-readTrnsCmd input =
-  case parse pTrnsCmd "TrnsCmd" input of
+readJtsCmd :: String -> Either ParseError JtsCmd
+readJtsCmd input =
+  case parse pJtsCmd "JtsCmd" input of
     Left err -> throwError err
     Right val -> return val
 
-pTrnsCmd :: Parser TrnsCmd
-pTrnsCmd = pBndCmd <|> pRplCmd <|> pTypCmd
+pJtsCmd :: Parser JtsCmd
+pJtsCmd = pBndCmd <|> pRplCmd <|> pTypCmd
 
-pBndCmd :: Parser TrnsCmd
+pBndCmd :: Parser JtsCmd
 pBndCmd = do
   string "bnd"
   spaces
@@ -37,7 +37,7 @@ pBndCmd = do
   maybeSpaces
   return $ BndCmd scope idName valName
 
-pRplCmd :: Parser TrnsCmd
+pRplCmd :: Parser JtsCmd
 pRplCmd = do
   string "rpl"
   spaces
@@ -47,7 +47,7 @@ pRplCmd = do
   maybeSpaces
   return $ RplCmd replace replaceWith
 
-pTypCmd :: Parser TrnsCmd
+pTypCmd :: Parser JtsCmd
 pTypCmd = do string "typ"
              tyDefDescs <- pTyDefDesc `sepBy1` (char '&')
              return $ TypCmd tyDefDescs

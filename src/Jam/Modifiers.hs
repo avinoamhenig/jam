@@ -1,4 +1,4 @@
-module Lang.Modifiers (
+module Jam.Modifiers (
   replace,
   bind,
   addTyDef,
@@ -6,26 +6,29 @@ module Lang.Modifiers (
 ) where
 
 import Prelude hiding (lookup)
-import Lang.AST
-import Lang.Accessors
+import Jam.Ast
+import Jam.Accessors
 import Util.IndexedMap
 import qualified Data.Map as M
 import Control.Monad.State
+import Control.Monad.Except (throwError)
+import Jam.Error
 
 _bind :: Id -> BindingVal -> Exp -> Exp
 _bind i v e = e { bindings = insert i v $ bindings e }
 
-bind :: String -> ExpPath -> State Prog (Maybe Id)
+bind :: String -> ExpPath -> StateThrowsJamError (Maybe Id)
 bind idName scopePath = do
   prog <- get
   case expAtPath prog scopePath of
     Nothing -> return Nothing
-    Just e -> do t <- (TyVarType . TyVar) <$> getUnique
-                 u <- getUnique
+    Just e -> do t <- liftState $ (TyVarType . TyVar) <$> getUnique
+                 u <- liftState $ getUnique
                  let ident = Id u idName t
                  prog <- get
-                 put $ replace prog scopePath $
-                         _bind ident (ExpVal $ BottomExp t empty) e
+                 prog <- lift $ replace prog scopePath $
+                                  _bind ident (ExpVal $ BottomExp t empty) e
+                 put prog
                  return $ Just ident
 
 addTyDef :: Prog -> TyDef -> Prog
@@ -67,10 +70,10 @@ copyType ty = do (newT, _) <- _copyType ty M.empty
           (newTs, newTvMap) <- copyParamTypes ts newTvMap
           return (newT:newTs, newTvMap)
 
-replace :: Prog -> ExpPath -> Exp -> Prog
+replace :: Prog -> ExpPath -> Exp -> ThrowsJamError Prog
 replace p path r =
   case expAtPath p path of
-    Nothing -> error "Replacing non-existent path"
+    Nothing -> throwError $ BadExpPath path
     Just e ->
       let parentPath = (parentExpPath path)
           (newTy, newProg) =
@@ -87,8 +90,8 @@ replace p path r =
           _r = r { typeof = newTy }
           (unifies, newestProg) =
             runState (unify (typeof e) (typeof _r)) newProg
-      in if unifies then _replace newestProg path _r
-                    else error "Types don't match"
+      in if unifies then return $ _replace newestProg path _r
+                    else throwError $ TypeMismatch (typeof e) (typeof _r)
   where
     _replace p (RootBindingExpPath i path) new = p {
       rootBindings = case lookup i $ rootBindings p of

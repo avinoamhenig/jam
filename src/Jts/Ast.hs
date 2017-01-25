@@ -1,4 +1,4 @@
-module Trns.AST (
+module Jts.Ast (
   IdName (..),
   ExpName (..),
   TyDefName (..),
@@ -7,8 +7,8 @@ module Trns.AST (
   TypeDesc (..),
   ConsDef (..),
   ExpCreator (..),
-  TrnsCmd (..),
-  TrnsScript (..)
+  JtsCmd (..),
+  JtsScript (..)
 ) where
 
 import Data.List (intercalate)
@@ -25,7 +25,7 @@ data ExpCreator = CrUnit
                 | CrApp ExpName ExpName
                 | CrIf ExpName ExpName ExpName
 
-data TrnsCmd = BndCmd ExpName IdName ExpName -- BndCmd scope idName valName
+data JtsCmd = BndCmd ExpName IdName ExpName -- BndCmd scope idName valName
              | RplCmd ExpName ExpCreator
              | TypCmd [TyDefDesc]
 
@@ -36,7 +36,7 @@ data TypeDesc = TyVarTypeDesc TyVarName
 
 data ConsDef = ConsDef IdName [TypeDesc]
 
-newtype TrnsScript = TrnsScript [TrnsCmd]
+newtype JtsScript = JtsScript [JtsCmd]
 
 instance Show ExpName   where show (ExpName   s) = ":" ++ s
 instance Show IdName    where show (IdName    s) = "$" ++ s
@@ -49,7 +49,7 @@ instance Show ExpCreator where
   show (CrApp a b) = "App(" ++ (show a) ++ " " ++ (show b) ++ ")"
   show (CrIf a b c) =
     "If(" ++ (show a) ++ " " ++ (show b) ++ " " ++ (show c) ++ ")"
-instance Show TrnsCmd where
+instance Show JtsCmd where
   show (BndCmd a b c) =
     "bnd " ++ (show a) ++ " " ++ (show b) ++ " " ++ (show c)
   show (RplCmd a b)   = "rpl " ++ (show a) ++ " " ++ (show b)
@@ -67,5 +67,5 @@ instance Show TypeDesc where
   show (TyDefTypeDesc tdn tds)
     | length tds == 0 = show tdn
     | otherwise = "(" ++ (show tdn) ++ " " ++ (unwords $ map show tds) ++ ")"
-instance Show TrnsScript where
-  show (TrnsScript cmds) = unlines $ map show cmds
+instance Show JtsScript where
+  show (JtsScript cmds) = unlines $ map show cmds

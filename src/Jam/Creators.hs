@@ -1,4 +1,4 @@
-module Lang.Creators (
+module Jam.Creators (
   createUnit, createUnit',
   createNum, createNum',
   createLambda,
@@ -8,8 +8,8 @@ module Lang.Creators (
 ) where
 
 import Util.IndexedMap
-import Lang.AST
-import Lang.Basis
+import Jam.Ast
+import Jam.Basis
 import Control.Monad.State
 
 _btm t = BottomExp { bindings = empty, typeof = t }
