@@ -9,7 +9,7 @@ module Jts.Interpreter (
 import Prelude hiding (lookup)
 import Data.Map hiding (map)
 import qualified Util.IndexedMap as IM
-import Jam.Ast
+import Jam.Ast hiding (Env)
 import Jts.Ast
 import Jam.Creators
 import Jam.Modifiers
@@ -75,13 +75,13 @@ useCreator _ env CrUnit = do e <- liftState createUnit
 useCreator _ env (CrNum x) = do e <- liftState $ createNum x
                                 return (e, env)
 useCreator path env (CrLambda (IdName idName) expName) = do
-  e <- liftState $ createLambda idName
+  e@(LambdaExp _ _ argId _ _) <- liftState $ createLambda idName
   return (
     e,
     bindIdName (bindExpName env expName $
                   appendExpPath path $
                     ChildExpPath LambdaBodyIndex endExpPath)
-               (IdName idName) (argId e) )
+               (IdName idName) argId )
 useCreator path env (CrApp funcName argName) = do
   e <- liftState createApp
   return (

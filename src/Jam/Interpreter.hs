@@ -13,22 +13,24 @@ import Data.List (elemIndex)
 import Jam.InterpreterError
 import Control.Monad.Except
 
+-- Interpret program.
 interpret :: Prog -> ThrowsJamInterpreterError Prog
 interpret = evalProg empty
 
-type Env = Map Id BindingVal
-
+-- Add a binding to an environment.
 extendEnv :: Env -> Id -> BindingVal -> Env
 extendEnv env ident value = insert ident value env
 
+-- Merge two environments. The second env get precedent in case of conflicts.
 mergeEnv :: Env -> Env -> Env
 mergeEnv e1 e2 = unionWith (\_ b -> b) e1 e2
 
+-- Evaluate a program given a starting environment.
 evalProg :: Env -> Prog -> ThrowsJamInterpreterError Prog
-evalProg env prog = do newEnv <- newEnv
-                       newRoot <- evalExp newEnv prog $ root prog
-                       return $ prog { root = newRoot }
-  where newEnv = evalBindings env prog $ rootBindings prog
+evalProg env prog = do
+  newEnv <- evalBindings env prog $ rootBindings prog
+  newRoot <- evalExp newEnv prog $ root prog
+  return $ prog { root = newRoot }
 
 evalBindings :: Env -> Prog -> Bindings -> ThrowsJamInterpreterError Env
 evalBindings env prog bindings = do
@@ -42,8 +44,8 @@ evalBindings env prog bindings = do
           newBv <- evalBindingVal (mergeEnv env newEnv) prog bv
           return $ extendEnv newEnv ident newBv
         updateCe newEnv bv = case bv of
-          ExpVal e@(LambdaExp { capturedEnv = (Just ce) }) ->
-            ExpVal $ e { capturedEnv = Just $ mergeEnv ce newEnv }
+          ExpVal (LambdaExp t b f x (Just ce)) ->
+            ExpVal $ LambdaExp t b f x (Just $ mergeEnv ce newEnv)
           e -> e
 
 evalBindingVal :: Env -> Prog -> BindingVal
@@ -54,97 +56,80 @@ evalBindingVal _ _ bv = return bv
 
 evalExp :: Env -> Prog -> Exp -> ThrowsJamInterpreterError Exp
 evalExp environment prog e = case e of
-  -- handle expressions without bindings
   BuiltInRef ref -> case lookup ref builtInFuncs of
                       Nothing -> error $ "Invalid built-in " ++ ref
                       Just e -> return e
   BuiltInExp _ -> return e
+  UnitExp t _ -> return $ UnitExp t IM.empty
+  NumExp t _ val -> return $ NumExp t IM.empty val
+  BottomExp _ _ -> throwError ReachedBottomExpression
 
-  -- handle expressions with bindings
-  _ -> do
-    env <- evalBindings environment prog $ bindings e
-    case e of
+  IdExp expType bindings ident -> do
+    env <- evalBindings environment prog bindings
+    case lookup ident env of
+      Nothing -> error $ "Identifier does not exist: " ++ show ident
+      Just bv -> case bv of ExpVal val -> evalExp env prog val
+                            TyDefDeconVal td -> return $
+                              makeDeconFnExp env td expType
+                            TyConVal _ -> return $ IdExp expType IM.empty ident
 
-      BottomExp {} -> throwError ReachedBottomExpression
+  IfExp _ bindings condExp thenExp elseExp -> do
+    env <- evalBindings environment prog bindings
+    cond <- evalExp env prog condExp
+    if isTrue cond
+      then evalExp env prog thenExp
+      else evalExp env prog elseExp
 
-      IdExp { ident = ident } ->
+  LambdaExp expType bindings argId body capturedEnv -> do
+    env <- evalBindings environment prog bindings
+    case capturedEnv of
+      Nothing -> return $ LambdaExp expType IM.empty argId body (Just env)
+      _       -> return e
+
+  AppExp expType bindings func argVal -> do
+    env <- evalBindings environment prog bindings
+    f <- evalExp env prog func
+    x <- evalExp env prog argVal
+    case f of
+      -- Eval result of calling built-in, in case it is needed (e.g. a decon
+      -- builtin).
+      BuiltInExp bf -> evalExp env prog (bf x)
+      LambdaExp _ _ argId body capturedEnv ->
+        case capturedEnv of
+          Nothing -> error "Evaluated lambda has no captured environment!"
+          Just ce -> evalExp (extendEnv ce argId $ ExpVal x) prog body
+      IdExp _ _ ident ->
         case lookup ident env of
-          Nothing -> error $ "Identifier does not exist: " ++ show ident
-          Just bv -> case bv of
-                      ExpVal val -> evalExp env prog val
-                      TyDefDeconVal td -> return $
-                          makeDeconFnExp env td (typeof e)
-                      TyConVal _ -> return $ e { bindings = IM.empty }
-
-      IfExp {} -> do cond <- evalExp env prog $ condExp e
-                     if (ident cond) == (basisIds ! "True")
-                       then evalExp env prog $ thenExp e
-                       else evalExp env prog $ elseExp e
-
-      LambdaExp {} -> case capturedEnv e of
-                        Nothing -> return $ e { capturedEnv = Just env }
-                        _ -> return $ e
-
-      AppExp {} -> do
-        f <- evalExp env prog $ func e
-        x <- evalExp env prog $ argVal e
-        case f of
-          BuiltInExp bf -> evalExp env prog (bf x)
-            -- eval reulst of  calling builting
-            -- in case it is needed, like in
-            -- case of a decon builtin
-          LambdaExp {} ->
-            case capturedEnv f of
-              Nothing -> error "Evaluated lambda has no captured environment!"
-              Just ce ->
-                evalExp (extendEnv ce (argId f) $ ExpVal x)
-                        prog
-                        (body f)
-          IdExp { ident = ident } ->
-            case lookup ident env of
-              Nothing -> error $ "Identifier does not exist: " ++ show ident
-              Just bv ->
-                case bv of
-                  TyConVal _ -> return $ AppExp { func = f
-                                                , argVal = x
-                                                , typeof = typeof e
-                                                , bindings = IM.empty
-                                                }
-                  _ -> error "Trying to apply non-applicable expression: " $
-                        show f
-          AppExp { typeof = t } -> return $ AppExp { func = f
-                                                   , argVal = x
-                                                   , typeof = t
-                                                   , bindings = IM.empty
-                                                   }
-          _ -> error "Trying to apply non-applicable expression: " $ show f
-
-      -- Atoms
-      _ -> return $ e { bindings = IM.empty }
+          Nothing -> error $ "Identifier does not exist: " ++ (show ident)
+          Just bv ->
+            case bv of
+              TyConVal _ -> return $ AppExp expType IM.empty f x
+              _ -> error $ "Trying to apply non-applicable expression: "
+                           ++ (show f)
+      AppExp t _ _ _ -> return $ AppExp t IM.empty f x
+      _ -> error $ "Trying to apply non-applicable expression: " ++ (show f)
 
 makeDeconFnExp :: Env -> TyDef -> Type -> Exp
 makeDeconFnExp env (TyDef _ _ _ tyCons) (TyDefType _ [_, retT]) =
   _af2b ((length tyCons) + 1) [] $ \args -> case (args !! 0) of
-    e@(AppExp {}) ->
-      let f = getAppFn e
+    AppExp retT _ func arg ->
+      let f = getAppFn func
       in case f of
-        IdExp { ident = ident } ->
+        IdExp _ _ ident ->
           case lookup ident env of
             Nothing -> error $ "Identifier does not exist: " ++ show ident
-            Just (TyConVal tyCon) ->
-              (replaceAppFn e $ args !! ((_index tyCon tyCons) + 1)) {
-                typeof = retT, bindings = IM.empty }
+            Just (TyConVal tyCon) -> replaceAppFn
+                                      (AppExp retT IM.empty func arg)
+                                      (args !! ((_index tyCon tyCons) + 1))
             _ -> error "Something is weird :/"
         _ -> error "Something went wrong"
-    IdExp {ident = ident} ->
+    IdExp _ _ ident ->
       case lookup ident env of
         Nothing -> error $ "Identifier does not exist: " ++ show ident
         Just (TyConVal tyCon) ->
-          AppExp { func = args !! ((_index tyCon tyCons) + 1)
-                 , argVal = createUnit'
-                 , typeof = retT
-                 , bindings = IM.empty
-                 }
+          AppExp retT IM.empty -- type, bindings
+                 (args !! ((_index tyCon tyCons) + 1)) -- func
+                 createUnit' -- argVal
         _ -> error "Something is weird :/"
     _ -> error "Something went wrong"
 makeDeconFnExp _ _ _ = error "Something went wrong!"
@@ -158,9 +143,9 @@ _af2b 1 args f = BuiltInExp (\x -> f (args ++ [x]))
 _af2b n args f = BuiltInExp (\x -> _af2b (n-1) (args ++ [x]) f)
 
 replaceAppFn :: Exp -> Exp -> Exp
-replaceAppFn e@(AppExp { func = f }) re = e { func = replaceAppFn f re }
+replaceAppFn (AppExp ty binds f x) re = AppExp ty binds (replaceAppFn f re) x
 replaceAppFn _ re = re
 
 getAppFn :: Exp -> Exp
-getAppFn (AppExp { func = f }) = getAppFn f
+getAppFn (AppExp _ _ f _) = getAppFn f
 getAppFn f = f

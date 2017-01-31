@@ -3,7 +3,7 @@ module Jts.Repl where
 import System.Exit
 import Jts.Parser
 import Control.Monad
-import Jam.Ast
+import Jam.Ast hiding (Env)
 import Jts.Ast
 import Jts.Interpreter
 import Jam.Interpreter
@@ -55,7 +55,7 @@ doCommand prog env (cmd:args)
                       Nothing -> Nothing
                       Just path -> case expAtPath prog path of
                         Nothing -> Nothing
-                        Just e -> Just $ typeof e
+                        Just e -> Just $ getType e
     in do
       case t of
         Nothing -> outputStr "Expression or identifier does not exist\n\n"

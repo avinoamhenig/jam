@@ -15,7 +15,7 @@ import Control.Monad.Except (throwError)
 import Jam.Error
 
 _bind :: Id -> BindingVal -> Exp -> Exp
-_bind i v e = e { bindings = insert i v $ bindings e }
+_bind i v e = setBindings e $ insert i v $ getBindings e
 
 bind :: String -> ExpPath -> StateThrowsJamError (Maybe Id)
 bind idName scopePath = do
@@ -38,7 +38,7 @@ _replaceSubExp :: Exp -> ExpPath -> Exp -> Exp
 _replaceSubExp _ RootExpPath new = new
 _replaceSubExp orig (RootBindingExpPath _ _) _ = orig
 _replaceSubExp orig (BindingExpPath i path) new =
-  case lookup i $ bindings orig of
+  case lookup i $ getBindings orig of
     Nothing -> orig
     Just bv -> case bv of
       ExpVal e -> _bind i (ExpVal $ _replaceSubExp e path new) orig
@@ -83,15 +83,15 @@ replace p path r =
                                   (ChildExpPath AppFuncIndex RootExpPath))
                       == path
                 then case r of
-                       IdExp { typeof = ty } -> runState (copyType ty) p
-                       _ -> (typeof r, p)
-                else (typeof r, p)
-              _ -> (typeof r, p)
-          _r = r { typeof = newTy }
+                       IdExp ty _ _ -> runState (copyType ty) p
+                       _ -> (getType r, p)
+                else (getType r, p)
+              _ -> (getType r, p)
+          _r = setType r newTy
           (unifies, newestProg) =
-            runState (unify (typeof e) (typeof _r)) newProg
+            runState (unify (getType e) (getType _r)) newProg
       in if unifies then return $ _replace newestProg path _r
-                    else throwError $ TypeMismatch (typeof e) (typeof _r)
+                    else throwError $ TypeMismatch (getType e) (getType _r)
   where
     _replace p (RootBindingExpPath i path) new = p {
       rootBindings = case lookup i $ rootBindings p of
@@ -132,3 +132,27 @@ unify t1 t2 = do p <- get
       if unifies then _unifyLists ps1 ps2
                  else return False
     _unifyLists _ _ = error "Types with same TyDef have different arity."
+
+setType :: Exp -> Type -> Exp
+setType e t = case e of
+  BottomExp _ binds -> BottomExp t binds
+  UnitExp _ binds -> UnitExp t binds
+  NumExp _ binds val -> NumExp t binds val
+  IdExp _ binds ident -> IdExp t binds ident
+  LambdaExp _ binds arg body cEnv -> LambdaExp t binds arg body cEnv
+  AppExp _ binds func arg -> AppExp t binds func arg
+  IfExp _ binds cExp tExp eExp -> IfExp t binds cExp tExp eExp
+  BuiltInExp _ -> e
+  BuiltInRef _ -> e
+
+setBindings :: Exp -> Bindings -> Exp
+setBindings e binds = case e of
+  BottomExp t _ -> BottomExp t binds
+  UnitExp t _ -> UnitExp t binds
+  NumExp t _ val -> NumExp t binds val
+  IdExp t _ ident -> IdExp t binds ident
+  LambdaExp t _ arg body cEnv -> LambdaExp t binds arg body cEnv
+  AppExp t _ func arg -> AppExp t binds func arg
+  IfExp t _ cExp tExp eExp -> IfExp t binds cExp tExp eExp
+  BuiltInExp _ -> e
+  BuiltInRef _ -> e

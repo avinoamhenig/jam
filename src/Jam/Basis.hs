@@ -9,7 +9,8 @@ module Jam.Basis (
   cFalse,
   unitType,
   numberType,
-  functionType
+  functionType,
+  isTrue
 ) where
 
 import qualified Util.IndexedMap as IM
@@ -30,9 +31,12 @@ unitType      = _unitType      basis
 numberType    = _numberType    basis
 functionType  = _functionType  basis
 
+isTrue :: Exp -> Bool
+isTrue (IdExp _ _ ident) = ident == (basisIds M.! "True")
+isTrue _ = False
+
 basisAndProg = runState makeBasis _p
-  where _p = Prog { root = BottomExp { bindings = IM.empty,
-                                       typeof = TyVarType $ TyVar 0 }
+  where _p = Prog { root = BottomExp (TyVarType $ TyVar 0) IM.empty
                   , rootBindings = IM.empty
                   , tydefs = []
                   , tyvarMap = M.empty

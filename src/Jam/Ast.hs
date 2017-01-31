@@ -12,7 +12,8 @@ module Jam.Ast (
   getUnique,
   getUniques,
   deparen,
-  Unique
+  Unique,
+  Env
 ) where
 
 import qualified Util.IndexedMap
@@ -81,70 +82,53 @@ isFnType :: Type -> Bool
 isFnType (TyDefType td _) = (show td) == "->"
 isFnType _ = False
 
+-- Interpreter environment data structure. This stores a mapping
+-- between identifiers and values.
+type Env = Map Id BindingVal
+
 data Exp = BuiltInExp (Exp -> Exp)
          | BuiltInRef String
-         | BottomExp { typeof :: Type
-                     , bindings :: Bindings
-                     }
-         | UnitExp   { typeof :: Type
-                     , bindings :: Bindings
-                     }
-         | NumExp    { value :: Int
-                     , typeof :: Type
-                     , bindings :: Bindings
-                     }
-         | IdExp     { ident :: Id
-                     , bindings :: Bindings
-                     , typeof :: Type
-                     }
-         | LambdaExp { argId :: Id
-                     , body :: Exp
-                     , bindings :: Bindings
-                     , typeof :: Type
-                     , capturedEnv :: Maybe (Map Id BindingVal)
-                     }
-         | AppExp    { func :: Exp
-                     , argVal :: Exp
-                     , typeof :: Type
-                     , bindings :: Bindings
-                     }
-         | IfExp     { condExp :: Exp
-                     , thenExp :: Exp
-                     , elseExp :: Exp
-                     , typeof :: Type
-                     , bindings :: Bindings
-                     }
+         | BottomExp Type Bindings
+         | UnitExp Type Bindings
+         | NumExp Type Bindings Int
+         | IdExp Type Bindings Id
+         --                        arg  body  capturedEnv
+         | LambdaExp Type Bindings Id   Exp   (Maybe Env)
+         --                     func  arg
+         | AppExp Type Bindings Exp   Exp
+         --                    cond  then  else
+         | IfExp Type Bindings Exp   Exp   Exp
 
 deparen s
   | (s !! 0) == '(' && length s > 2 = (take ((length s) - 2) . drop 1) s
   | otherwise = s
-_wrapLet e s =
+_wrapLet bindings s =
   let bindingStrs =
         Util.IndexedMap.foldWithKey
           (\(Id _ name _) val acc -> case val of
             ExpVal ev -> ("(" ++ name ++ " = "
                               ++ (deparen $ show ev) ++ ")") : acc
             _ -> acc )
-          [] $ bindings e
+          [] $ bindings
       letStr = unwords bindingStrs
   in if (length letStr) > 0
       then "(let " ++ letStr ++ " in " ++ (deparen s) ++ ")"
       else s
 instance Show Exp where
-  show e@(BottomExp {}) = _wrapLet e $ "_"
-  show e@(UnitExp {}) = _wrapLet e $ "()"
-  show e@(NumExp { value = val }) = _wrapLet e (show val)
-  show e@(BuiltInRef n) = _wrapLet e $ "<Built-in " ++ n ++ ">"
-  show e@(BuiltInExp _) = _wrapLet e $ "<Built-in>"
-  show e@(IdExp { ident = ident }) = _wrapLet e $ show ident
-  show e@(LambdaExp {}) = _wrapLet e $  "(\\" ++ (show $ argId e)
-                                              ++ " -> "
-                                              ++ (deparen . show $ body e)
-                                              ++ ")"
-  show e@(AppExp {}) = _wrapLet e $ "(" ++ (show $ func e) ++ " "
-                                        ++ (show $ argVal e) ++ ")"
-  show e@(IfExp {}) = _wrapLet e $ "(if " ++ (show $ condExp e) ++ " then "
-                                          ++ (show $ thenExp e) ++ " else "
-                                          ++ (show $ elseExp e) ++ ")"
+  show (BottomExp _ b) = _wrapLet b $ "_"
+  show (UnitExp _ b) = _wrapLet b $ "()"
+  show (NumExp _ b val) = _wrapLet b (show val)
+  show (BuiltInRef n) = "<Built-in " ++ n ++ ">"
+  show (BuiltInExp _) = "<Built-in>"
+  show (IdExp _ b ident) = _wrapLet b $ show ident
+  show (LambdaExp _ b arg body _) = _wrapLet b $  "(\\" ++ (show arg)
+                                                 ++ " -> "
+                                                 ++ (deparen $ show body)
+                                                 ++ ")"
+  show (AppExp _ b func arg) = _wrapLet b $ "(" ++ (show func) ++ " "
+                                                ++ (show arg)  ++ ")"
+  show (IfExp _ b c t e) = _wrapLet b $ "(if " ++ (show c) ++ " then "
+                                               ++ (show t) ++ " else "
+                                               ++ (show e) ++ ")"
 
 instance Show Prog where show p = deparen $ show $ root p

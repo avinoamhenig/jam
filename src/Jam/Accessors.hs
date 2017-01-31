@@ -10,7 +10,9 @@ module Jam.Accessors (
   findIdFromPath,
   findRootId,
   finalType,
-  arity
+  arity,
+  getType,
+  getBindings
 ) where
 
 import Prelude hiding (lookup)
@@ -20,6 +22,30 @@ import Jam.Ast
 
 constructors (TyDef _ _ _ cs) = cs
 arity (TyDef _ _ a _) = a
+
+getType :: Exp -> Type
+getType e = case e of
+  BottomExp ty _ -> ty
+  UnitExp ty _ -> ty
+  NumExp ty _ _ -> ty
+  IdExp ty _ _ -> ty
+  LambdaExp ty _ _ _ _ -> ty
+  AppExp ty _ _ _ -> ty
+  IfExp ty _ _ _ _ -> ty
+  BuiltInExp _ -> error "Attempted to get type of BuiltInExp"
+  BuiltInRef _ -> error "Attempted to get type of BuiltInRef"
+
+getBindings :: Exp -> Bindings
+getBindings e = case e of
+  BottomExp _ binds -> binds
+  UnitExp _ binds -> binds
+  NumExp _ binds _ -> binds
+  IdExp _ binds _ -> binds
+  LambdaExp _ binds _ _ _ -> binds
+  AppExp _ binds _ _ -> binds
+  IfExp _ binds _ _ _ -> binds
+  BuiltInExp _ -> empty
+  BuiltInRef _ -> empty
 
 data ExpPath = RootExpPath
              | RootBindingExpPath Id ExpPath
@@ -70,7 +96,7 @@ subExpAtPath :: Exp -> ExpPath -> Maybe Exp
 subExpAtPath e RootExpPath = Just e
 subExpAtPath _ (RootBindingExpPath _ _) = Nothing
 subExpAtPath e (BindingExpPath ident path) =
-  case lookup ident $ bindings e of
+  case lookup ident $ getBindings e of
     Nothing -> Nothing
     (Just bv) -> case bv of
       (ExpVal sub) -> subExpAtPath sub path
@@ -80,23 +106,26 @@ subExpAtPath e (ChildExpPath index path) =
     Nothing -> Nothing
     (Just sub) -> subExpAtPath sub path
 
-getArgU :: Exp -> Maybe Unique
-getArgU (LambdaExp { argId = (Id u _ _)}) = Just u
-getArgU _ = Nothing
+argIdForUniq :: Exp -> Unique -> Maybe Id
+argIdForUniq (LambdaExp _ _ ident@(Id u' _ _) _ _) u = if u == u'
+                                                       then Just ident
+                                                       else Nothing
+argIdForUniq _ _ = Nothing
 
 findIdFromPath :: Prog -> Unique -> ExpPath -> Maybe Id
 findIdFromPath prog idU path =
   case expAtPath prog path of
     Nothing -> Nothing
     Just e ->
-      if (getArgU e) == Just idU
-        then Just $ argId e
-        else case foldWithKey (_foldIdHelper idU) Nothing $ bindings e of
-          Nothing -> case path of
-            RootExpPath            -> findRootId prog idU
-            RootBindingExpPath _ _ -> findRootId prog idU
-            _ -> findIdFromPath prog idU $ parentExpPath path
-          Just ident -> Just ident
+      case argIdForUniq e idU of
+        Just ident -> Just ident
+        Nothing ->
+          case foldWithKey (_foldIdHelper idU) Nothing $ getBindings e of
+            Just ident -> Just ident
+            Nothing -> case path of
+              RootExpPath            -> findRootId prog idU
+              RootBindingExpPath _ _ -> findRootId prog idU
+              _ -> findIdFromPath prog idU $ parentExpPath path
 
 _foldIdHelper _ _ _ (Just ident) = Just ident
 _foldIdHelper idU ident@(Id u _ _) _ _
@@ -107,21 +136,28 @@ findRootId :: Prog -> Unique -> Maybe Id
 findRootId prog idU =
   foldWithKey (_foldIdHelper idU) Nothing $ rootBindings prog
 
-childExp LambdaBodyIndex e@(LambdaExp {}) = Just $ body e
-childExp AppFuncIndex e@(AppExp {}) = Just $ func e
-childExp AppArgIndex e@(AppExp {}) = Just $ argVal e
-childExp IfCondIndex e@(IfExp {}) = Just $ condExp e
-childExp IfThenIndex e@(IfExp {}) = Just $ thenExp e
-childExp IfElseIndex e@(IfExp {}) = Just $ elseExp e
+childExp :: ChildExpIndex -> Exp -> Maybe Exp
+childExp LambdaBodyIndex (LambdaExp _ _ _ body _) = Just body
+childExp AppFuncIndex (AppExp _ _ func _) = Just func
+childExp AppArgIndex (AppExp _ _ _ arg) = Just arg
+childExp IfCondIndex (IfExp _ _ condExp _ _) = Just condExp
+childExp IfThenIndex (IfExp _ _ _ thenExp _) = Just thenExp
+childExp IfElseIndex (IfExp _ _ _ _ elseExp) = Just elseExp
 childExp _ _ = Nothing
 
-childExpSetter LambdaBodyIndex e@(LambdaExp{}) =
-  Just $ (\c -> e { body = c })
-childExpSetter AppFuncIndex e@(AppExp{}) = Just $ (\c -> e { func = c })
-childExpSetter AppArgIndex e@(AppExp{}) = Just $ (\c -> e { argVal = c })
-childExpSetter IfCondIndex e@(IfExp{}) = Just $ (\c -> e { condExp = c })
-childExpSetter IfThenIndex e@(IfExp{}) = Just $ (\c -> e { thenExp = c })
-childExpSetter IfElseIndex e@(IfExp{}) = Just $ (\c -> e { elseExp = c })
+childExpSetter :: ChildExpIndex -> Exp -> Maybe (Exp -> Exp)
+childExpSetter LambdaBodyIndex (LambdaExp ty binds arg _ capturedEnv) =
+  Just $ (\c -> LambdaExp ty binds arg c capturedEnv)
+childExpSetter AppFuncIndex (AppExp ty binds _ arg) =
+  Just $ (\c -> AppExp ty binds c arg)
+childExpSetter AppArgIndex (AppExp ty binds func _) =
+  Just $ (\c -> AppExp ty binds func c)
+childExpSetter IfCondIndex (IfExp ty binds _ thenExp elseExp) =
+  Just $ (\c -> IfExp ty binds c thenExp elseExp)
+childExpSetter IfThenIndex (IfExp ty binds condExp _ elseExp) =
+  Just $ (\c -> IfExp ty binds condExp c elseExp)
+childExpSetter IfElseIndex (IfExp ty binds condExp thenExp _) =
+  Just $ (\c -> IfExp ty binds condExp thenExp c)
 childExpSetter _ _ = Nothing
 
 finalType :: Prog -> Type -> Type
