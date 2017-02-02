@@ -1,8 +1,7 @@
 module Jam.Modifiers (
   replace,
   bind,
-  addTyDef,
-  unify
+  addTyDef
 ) where
 
 import Prelude hiding (lookup)

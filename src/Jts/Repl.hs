@@ -77,13 +77,13 @@ runLine :: String -> Prog -> Env -> InputT IO (Prog, Env)
 runLine code prog env = case readJtsCmd code of
                           Left e -> do outputStr $ (show e) ++ "\n\n"
                                        return (prog, env)
+                          -- Uncomment below to just print parsed cmd
+                          -- Right cmd -> do outputStr $ (show cmd) ++ "\n\n"
+                          --                 return $ (prog, env)
                           Right cmd -> case runExcept $ runCmd prog env cmd of
                             Left e -> do outputStr $ (show e) ++ "\n\n"
                                          return (prog, env)
                             Right (prog, env) -> return (prog, env)
-                          -- Uncomment below to just print parsed cmd
-                          -- Right cmd -> do outputStr $ (show cmd) ++ "\n\n"
-                                          -- return $ (prog, env)
 
 runFile :: FilePath -> Prog -> Env -> InputT IO (Prog, Env)
 runFile file prog env = _runFile `catch` handleError

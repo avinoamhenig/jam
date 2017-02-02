@@ -8,6 +8,7 @@ module Jts.Error (
 
 import Jts.Ast
 import Jam.Ast
+import Jam.Accessors (ExpPath)
 import Jam.Error
 import Control.Monad.State
 import Control.Monad.Except
@@ -15,6 +16,7 @@ import Control.Monad.Identity
 
 data JtsError = BadExpLookup ExpName
               | BadIdLookup IdName
+              | IdOutOfScope IdName ExpPath
               | BadTyVarLookup TyVarName
               | BadTyDefLookup TyDefName
               | EmptyTyDef TyDef

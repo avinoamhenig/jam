@@ -100,12 +100,15 @@ useCreator path env (CrIf cName tName eName) = do
                   appendExpPath path $ ChildExpPath IfThenIndex endExpPath
     in bindExpName e2 eName $
         appendExpPath path $ ChildExpPath IfElseIndex endExpPath )
-useCreator _ env (CrIdExp idName@(IdName name)) = do
+useCreator path env (CrIdExp idName@(IdName name)) = do
+  prog <- get
   case lookup idName (idNames env) of
     Nothing -> case lookup name basisIds of
       Nothing -> lift $ throwError $ BadIdLookup idName
       Just ident -> (liftState $ createIdExp ident) >>= \e -> return (e, env)
-    Just ident -> (liftState $ createIdExp ident) >>= \e -> return (e, env)
+    Just (Id u _ _) -> case findIdFromPath prog u path of
+      Nothing -> lift $ throwError $ IdOutOfScope idName path
+      Just ident -> (liftState $ createIdExp ident) >>= \e -> return (e, env)
 
 typCmdToTyDefs :: Env -> [TyDefDesc] -> StateThrowsJtsError (Env, [TyDef])
 typCmdToTyDefs env tdds = do
