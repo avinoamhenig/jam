@@ -23,7 +23,10 @@ import Control.Monad.Trans.Class (lift)
 makeProgram = basisProg
 makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath
               , idNames = empty
-              , tyDefNames = empty }
+              , tyDefNames = fromList $ map (\td@(TyDef _ name _ _) ->
+                                              (TyDefName name, td))
+                                        basisTypes
+              }
 
 data Env = Env { expNames   :: Map ExpName   ExpPath
                , idNames    :: Map IdName    Id
