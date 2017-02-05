@@ -1,16 +1,16 @@
-# odd/even using nested lets:
-# let even = ( let _even = \x -> if x < 2 then x = 0 else _odd  (x - 1)
-#                  _odd  = \y -> if y < 2 then x = 1 else _even (y - 1)
-#              in (\_ -> _even) () )
-# in even 7
+-- odd/even using nested lets:
+-- let even = ( let _even = \x -> if x < 2 then x = 0 else _odd  (x - 1)
+--                  _odd  = \y -> if y < 2 then x = 1 else _even (y - 1)
+--              in (\_ -> _even) () )
+-- in even 7
 
-# create root exp first so that we don't overwrite root bindings later
+-- create root exp first so that we don't overwrite root bindings later
 rpl :root App(:rf :ra)
 
-# $even
+-- $even
 bnd :root $even :even
 
-# $_even
+-- $_even
 rpl :even App(:f :a)
 rpl :a Unit()
 rpl :f Lambda($_ :even_ref)
@@ -18,7 +18,7 @@ bnd :even $_even :_even
 bnd :even $_odd  :_odd
 rpl :even_ref IdExp($_even)
 
-# _even
+-- _even
 rpl :_even Lambda($x :body)
 rpl :body If(:c :t :e)
 
@@ -43,7 +43,7 @@ rpl :a1 IdExp($x)
 rpl :a2 Num(1)
 
 
-# _odd
+-- _odd
 rpl :_odd Lambda($y :body)
 rpl :body If(:c :t :e)
 
@@ -68,6 +68,6 @@ rpl :a1 IdExp($y)
 rpl :a2 Num(1)
 
 
-# root exp: even 7
+-- root exp: even 7
 rpl :rf IdExp($even)
 rpl :ra Num(6)

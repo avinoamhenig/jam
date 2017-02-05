@@ -12,7 +12,8 @@ module Jam.Accessors (
   finalType,
   arity,
   getType,
-  getBindings
+  getBindings,
+  isInsideBinding
 ) where
 
 import Prelude hiding (lookup)
@@ -61,6 +62,16 @@ data ChildExpIndex = LambdaBodyIndex
                    | IfThenIndex
                    | IfElseIndex
                    deriving (Eq, Show)
+
+isInsideBinding :: ExpPath -> Id -> Bool
+isInsideBinding RootExpPath _ = False
+isInsideBinding (ChildExpPath _ childPath) i = isInsideBinding childPath i
+isInsideBinding (RootBindingExpPath i' childPath) i
+  | i == i' = True
+  | otherwise = isInsideBinding childPath i
+isInsideBinding (BindingExpPath i' childPath) i
+  | i == i' = True
+  | otherwise = isInsideBinding childPath i
 
 appendExpPath :: ExpPath -> ExpPath -> ExpPath
 appendExpPath RootExpPath p2 = p2

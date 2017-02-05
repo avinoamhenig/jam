@@ -82,7 +82,10 @@ replace p path r =
                                   (ChildExpPath AppFuncIndex RootExpPath))
                       == path
                 then case r of
-                       IdExp ty _ _ -> runState (copyType ty) p
+                       IdExp ty _ ident ->
+                          if isInsideBinding path ident
+                            then (getType r, p)
+                            else runState (copyType $ finalType p ty) p
                        _ -> (getType r, p)
                 else (getType r, p)
               _ -> (getType r, p)
@@ -111,13 +114,16 @@ unify t1 t2 = do p <- get
     _unify (TyVarType tv1) (TyVarType tv2) = do
       t3 <- (TyVarType . TyVar) <$> getUnique
       p <- get
-      put $ p { tyvarMap = M.insert tv1 t3 $
-                            M.insert tv2 t3 $ tyvarMap p }
+      when (tv1 /= tv2) $ put $ p { tyvarMap = M.insert tv1 t3 $
+                                                 M.insert tv2 t3 $ tyvarMap p }
       return True
     _unify (TyVarType tv) t2 = do
       p <- get
-      put $ p { tyvarMap = M.insert tv t2 $ tyvarMap p }
-      return True
+      if typeContainsVar tv t2
+        then return False
+        else do
+          put $ p { tyvarMap = M.insert tv t2 $ tyvarMap p }
+          return True
     _unify t2 t1@(TyVarType _) = _unify t1 t2
     _unify (TyDefType td1 ps1) (TyDefType td2 ps2) =
       if td1 /= td2
@@ -131,6 +137,10 @@ unify t1 t2 = do p <- get
       if unifies then _unifyLists ps1 ps2
                  else return False
     _unifyLists _ _ = error "Types with same TyDef have different arity."
+
+typeContainsVar :: TyVar -> Type -> Bool
+typeContainsVar tv (TyVarType tv') = tv' == tv
+typeContainsVar tv (TyDefType _ ts) = any (typeContainsVar tv) ts
 
 setType :: Exp -> Type -> Exp
 setType e t = case e of

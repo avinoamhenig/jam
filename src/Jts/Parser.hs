@@ -168,7 +168,7 @@ maybeSpaces = skipMany $ oneOf " \t"
 
 maybeComment :: Parser ()
 maybeComment = do
-  skipMany1 $ char '#'
+  skipMany1 $ string "--"
   skipMany  $ noneOf "\n"
 
 emptyline :: Parser ()
