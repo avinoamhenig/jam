@@ -1,5 +1,3 @@
-typ #Tuple a b = $Tuple a b
-
 rpl :root App(:f :tupleCase)
 rpl :f    App(:f :toDecon)
 rpl :f    IdExp($Tuple.Decon)

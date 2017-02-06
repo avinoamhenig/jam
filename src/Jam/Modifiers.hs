@@ -7,6 +7,7 @@ module Jam.Modifiers (
 import Prelude hiding (lookup)
 import Jam.Ast
 import Jam.Accessors
+import Jam.Basis
 import Util.IndexedMap
 import qualified Data.Map as M
 import Control.Monad.State
@@ -74,24 +75,17 @@ replace p path r =
   case expAtPath p path of
     Nothing -> throwError $ BadExpPath path
     Just e ->
-      let parentPath = (parentExpPath path)
-          (newTy, newProg) =
-            case expAtPath p parentPath of
-              Just (AppExp {}) ->
-                if (appendExpPath parentPath
-                                  (ChildExpPath AppFuncIndex RootExpPath))
-                      == path
-                then case r of
-                       IdExp ty _ ident ->
-                          if isInsideBinding path ident
-                            then (getType r, p)
-                            else runState (copyType $ finalType p ty) p
-                       _ -> (getType r, p)
-                else (getType r, p)
-              _ -> (getType r, p)
+      let (newTy, newProg) =
+            case r of IdExp ty _ ident ->
+                        if isTyCon ident
+                           || ((isFunctionType $ finalType p ty) &&
+                               (not $ isInsideBinding path ident))
+                           then runState (copyType $ finalType p ty) p
+                           else (getType r, p)
+                      _ ->      (getType r, p)
           _r = setType r newTy
-          (unifies, newestProg) =
-            runState (unify (getType e) (getType _r)) newProg
+          (unifies, newestProg) = runState (unify (getType e) (getType _r))
+                                           newProg
       in if unifies then return $ _replace newestProg path _r
                     else throwError $ TypeMismatch (getType e) (getType _r)
   where

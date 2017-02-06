@@ -1,0 +1,5 @@
+rpl :root App(:rf :ra)
+bnd :root $main :_main
+rpl :_main Lambda($_ :main)
+rpl :rf IdExp($main)
+rpl :ra Unit()

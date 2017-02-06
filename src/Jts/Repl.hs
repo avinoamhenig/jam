@@ -46,7 +46,7 @@ doCommand prog env (cmd:args)
         t = if prefix /= ':'
             then let iname = if prefix == '$' then name else prefix:name
                  in case lookup (IdName iname) (idNames env) of
-                      Nothing -> case lookup iname basisIds of
+                      Nothing -> case lookup iname (basisIds basis) of
                         Nothing -> Nothing
                         Just (Id _ _ t) -> Just t
                       Just (Id _ _ t) -> Just t

@@ -25,7 +25,7 @@ makeEnv = Env { expNames = singleton (ExpName "root") RootExpPath
               , idNames = empty
               , tyDefNames = fromList $ map (\td@(TyDef _ name _ _) ->
                                               (TyDefName name, td))
-                                        basisTypes
+                                        (basisTypes basis)
               }
 
 data Env = Env { expNames   :: Map ExpName   ExpPath
@@ -106,7 +106,7 @@ useCreator path env (CrIf cName tName eName) = do
 useCreator path env (CrIdExp idName@(IdName name)) = do
   prog <- get
   case lookup idName (idNames env) of
-    Nothing -> case lookup name basisIds of
+    Nothing -> case lookup name (basisIds basis) of
       Nothing -> lift $ throwError $ BadIdLookup idName
       Just ident -> (liftState $ createIdExp ident) >>= \e -> return (e, env)
     Just (Id u _ _) -> case findIdFromPath prog u path of
@@ -153,29 +153,30 @@ bindTyConIds (td@(TyDef _ name _ tcs):tds) env = do
 
 deconType :: TyDef -> TyVar -> ThrowsJtsError Type
 deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $
-  TyDefType functionType [finalReturnType tcT, _deconClauseTypes tcs tv]
+  TyDefType (functionType basis) [finalReturnType tcT, _deconClauseTypes tcs tv]
   where _deconClauseTypes tcs tv =
           typesToFuncType (map (\(TyCon _ _ t) ->
                                   _wrapInFnTy $ conTyToDeconClauseType t tv)
                                tcs)
                           (TyVarType tv)
-        _wrapInFnTy t@(TyDefType td _) | td == functionType = t
-        _wrapInFnTy t = TyDefType functionType [(TyDefType unitType []), t]
+        _wrapInFnTy t@(TyDefType td _) | td == (functionType basis) = t
+        _wrapInFnTy t = TyDefType (functionType basis)
+                                  [(TyDefType (unitType basis) []), t]
 deconType td _ = throwError $ EmptyTyDef td
 
 finalReturnType :: Type -> Type
 finalReturnType t@(TyDefType td paramTs)
-  | td == functionType = finalReturnType (paramTs !! 1)
+  | td == (functionType basis) = finalReturnType (paramTs !! 1)
   | otherwise = t
 finalReturnType t = t
 
 conTyToDeconClauseType :: Type -> TyVar -> Type
 conTyToDeconClauseType (TyVarType _) _ = error "Something is wrong"
 conTyToDeconClauseType (TyDefType td paramTs) retTv
-  | td == functionType = TyDefType functionType [
-                            paramTs !! 0,
-                            conTyToDeconClauseType (paramTs !! 1) retTv
-                          ]
+  | td == (functionType basis) = TyDefType (functionType basis) [
+                                   paramTs !! 0,
+                                   conTyToDeconClauseType (paramTs !! 1) retTv
+                                   ]
   | otherwise = TyVarType retTv
 
 tyDefDescToTyDef :: Env -> Map TyDefName TyDef -> (Unique, TyDefDesc)
@@ -219,4 +220,5 @@ tyDescToType env curTdMap tvMap (TyDefTypeDesc tdn tds) =
 
 typesToFuncType :: [Type] -> Type -> Type
 typesToFuncType [] rt = rt
-typesToFuncType (t:ts) rt = TyDefType functionType [t, typesToFuncType ts rt]
+typesToFuncType (t:ts) rt = TyDefType (functionType basis)
+                                      [t, typesToFuncType ts rt]

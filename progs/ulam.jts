@@ -1,0 +1,65 @@
+-- === ulam ===
+-- \n -> if (n % 2) = 0 then n/2 else 3*n + 1
+
+bnd :root $ulam :ulam
+rpl :ulam Lambda($n :body)
+rpl :body If(:c :t :e)
+
+-- if (n % 2) = 0
+rpl :c App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($=)
+rpl :a2 Num(0)
+rpl :a1 App(:f :a2)
+rpl :f  App(:f :a1)
+rpl :f IdExp($%)
+rpl :a1 IdExp($n)
+rpl :a2 Num(2)
+
+-- then n / 2
+rpl :t App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($/)
+rpl :a1 IdExp($n)
+rpl :a2 Num(2)
+
+-- else (3 * n) + 1
+rpl :e App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($+)
+rpl :a2 Num(1)
+rpl :a1 App(:f :a2)
+rpl :f  App(:f :a1)
+rpl :f IdExp($*)
+rpl :a1 Num(3)
+rpl :a2 IdExp($n)
+
+
+
+-- === ulamChain ===
+-- \n -> if n <= 1 then Nil else Cons n (ulamChain (ulam n))
+
+bnd :root $ulamChain :ulamChain
+rpl :ulamChain Lambda($n :body)
+rpl :body If(:c :t :e)
+
+-- if n <= 1
+rpl :c App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($<=)
+rpl :a1 IdExp($n)
+rpl :a2 Num(1)
+
+-- then Nil
+rpl :t IdExp($Nil)
+
+-- else Cons n (ulamChain (ulam n))
+rpl :e App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($n)
+rpl :a2 App(:f :a)
+rpl :f IdExp($ulamChain)
+rpl :a App(:f :a)
+rpl :f IdExp($ulam)
+rpl :a IdExp($n)

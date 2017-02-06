@@ -13,7 +13,8 @@ module Jam.Accessors (
   arity,
   getType,
   getBindings,
-  isInsideBinding
+  isInsideBinding,
+  isTyCon
 ) where
 
 import Prelude hiding (lookup)
@@ -35,6 +36,13 @@ getType e = case e of
   IfExp ty _ _ _ _ -> ty
   BuiltInExp _ -> error "Attempted to get type of BuiltInExp"
   BuiltInRef _ -> error "Attempted to get type of BuiltInRef"
+
+isTyCon :: Id -> Bool                   -- the idea here is that any ident
+isTyCon (Id _ _ (TyDefType _ _)) = True -- would have a tyvar as the first type
+isTyCon _ = False                       -- (with type constraints specializing
+                                        -- the type), except for constructors,
+                                        -- which would have the tydef as
+                                        -- the first type.
 
 getBindings :: Exp -> Bindings
 getBindings e = case e of
