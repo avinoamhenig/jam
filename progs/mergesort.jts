@@ -1,0 +1,219 @@
+-- =================================
+-- === split : [a] -> ([a], [a]) ===
+-- =================================
+
+-- split ls =
+--   case ls of
+--     x:xs ->
+--       case xs of
+--         x':xs' ->
+--           case split xs' of
+--             (left, right) -> (x:left, x':right)
+--         [] -> (ls, [])
+--     [] -> ([], [])
+
+bnd :root $split :split
+rpl :split Lambda($ls :body)
+
+-- List.Decon ls (Cons x xs -> _) (Nil -> _)
+rpl :body App(:f :caseEmpty)
+rpl :f    App(:f :caseCons)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($ls)
+
+-- Cons x xs -> List.Decon xs (Cons x' xs' -> _) (Nil -> _)
+rpl :caseCons Lambda($x  :body)
+rpl :body     Lambda($xs :body)
+rpl :body App(:f :caseOne)
+rpl :f    App(:f :caseTwo)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($xs)
+
+-- :caseTwo // Cons x' xs' -> Tuple.Decon (split xs') :caseTuple
+rpl :caseTwo Lambda($x'  :body)
+rpl :body    Lambda($xs' :body)
+rpl :body App(:f :caseTuple)
+rpl :f    App(:f :recursiveSplit)
+rpl :f IdExp($Tuple.Decon)
+rpl :recursiveSplit App(:f :a)
+rpl :f IdExp($split)
+rpl :a IdExp($xs')
+
+-- :caseTuple // Tuple left right -> Tuple (Cons x left) (Cons x' right)
+rpl :caseTuple Lambda($left  :body)
+rpl :body      Lambda($right :body)
+rpl :body App(:f :newRight)
+rpl :f    App(:f :newLeft)
+rpl :f IdExp($Tuple)
+rpl :newLeft App(:f :a2)    -- Cons x left
+rpl :f       App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($x)
+rpl :a2 IdExp($left)
+rpl :newRight App(:f :a2)    -- Cons x' right
+rpl :f        App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($x')
+rpl :a2 IdExp($right)
+
+-- :caseOne // Nil -> Tuple ls Nil
+rpl :caseOne Lambda($_ :body)
+rpl :body App(:f :a2)
+rpl :f    App(:f :a1)
+rpl :f IdExp($Tuple)
+rpl :a1 IdExp($ls)
+rpl :a2 IdExp($Nil)
+
+-- :caseEmpty // Nil -> Tuple Nil Nil
+rpl :caseEmpty Lambda($_ :body)
+rpl :body App(:f :a2)
+rpl :f    App(:f :a1)
+rpl :f IdExp($Tuple)
+rpl :a1 IdExp($Nil)
+rpl :a2 IdExp($Nil)
+
+
+
+-- ================================================
+-- === merge : [Number] -> [Number] -> [Number] ===
+-- ================================================
+
+-- merge la lb =
+--   case la of
+--     a:as ->    -- :laFull
+--       case lb of
+--         b:bs -> if a < b  -- :lbFull
+--                   then a:(merge as lb)
+--                   else b:(merge la bs)
+--         [] -> la          -- :lbEmpty
+--     [] -> lb   -- :laEmpty
+
+bnd :root $merge :merge
+rpl :merge Lambda($la :merge)
+rpl :merge Lambda($lb :merge)
+
+-- List.Decon la (Cons a as -> :laFull) (Nil -> :laEmpty)
+rpl :merge App(:f :laEmpty)
+rpl :f     App(:f :laFull)
+rpl :f     App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($la)
+
+-- :laFull // Cons a as -> List.Decon lb (Cons b bs -> :lbFull)
+--                                       (Nil -> :lbEmpty)
+rpl :laFull Lambda($a  :body)
+rpl :body   Lambda($as :body)
+rpl :body App(:f :lbEmpty)
+rpl :f    App(:f :lbFull)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($lb)
+
+-- :lbFull // Cons b bs -> if a < b then a:(merge as lb)
+--                                  else b:(merge la bs)
+rpl :lbFull Lambda($b  :body)
+rpl :body   Lambda($bs :body)
+rpl :body If(:c :t :e)
+
+rpl :c App(:f :a2)  -- if a < b
+rpl :f App(:f :a1)
+rpl :f IdExp($<)
+rpl :a1 IdExp($a)
+rpl :a2 IdExp($b)
+
+rpl :t App(:f :a2)  -- then Cons a (merge as lb)
+rpl :f App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($a)
+rpl :a2 App(:f :a2)
+rpl :f  App(:f :a1)
+rpl :f IdExp($merge)
+rpl :a1 IdExp($as)
+rpl :a2 IdExp($lb)
+
+rpl :e App(:f :a2)  -- else Cons b (merge la bs)
+rpl :f App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($b)
+rpl :a2 App(:f :a2)
+rpl :f  App(:f :a1)
+rpl :f IdExp($merge)
+rpl :a1 IdExp($la)
+rpl :a2 IdExp($bs)
+
+-- :lbEmpty // Nil -> la
+rpl :lbEmpty Lambda($_ :body)
+rpl :body IdExp($la)
+
+-- :laEmpty // Nil -> lb
+rpl :laEmpty Lambda($_ :body)
+rpl :body IdExp($lb)
+
+
+-- ========================================
+-- === mergesort : [Number] -> [Number] ===
+-- ========================================
+
+-- mergesort ls =
+--   case ls of
+--     x:xs ->
+--       case xs of
+--         x':xs' ->
+--           case split ls of
+--             (left, right) -> merge (mergesort left) (mergesort right)
+--         [] -> ls
+--     [] -> []
+
+bnd :root $mergesort :mergesort
+rpl :mergesort Lambda($ls :body)
+
+-- List.Decon ls (Cons x xs -> :caseCons) (Nil -> :caseEmpty)
+rpl :body App(:f :caseEmpty)
+rpl :f    App(:f :caseCons)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($ls)
+
+-- :caseCons // Cons x xs -> List.Decon xs (Cons x' xs' -> :caseTwo)
+--                                         (Nil -> :caseOne)
+rpl :caseCons Lambda($x  :body)
+rpl :body     Lambda($xs :body)
+rpl :body App(:f :caseOne)
+rpl :f    App(:f :caseTwo)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($xs)
+
+-- :caseTwo // Cons x' xs' -> Tuple.Decon (split ls) :caseTuple
+rpl :caseTwo Lambda($x'  :body)
+rpl :body    Lambda($xs' :body)
+rpl :body App(:f :caseTuple)
+rpl :f    App(:f :split)
+rpl :f IdExp($Tuple.Decon)
+rpl :split App(:f :a)
+rpl :f IdExp($split)
+rpl :a IdExp($ls)
+
+-- :caseTuple // Tuple left right -> merge (mergesort left)
+--                                         (mergesort right)
+rpl :caseTuple Lambda($left  :body)
+rpl :body      Lambda($right :body)
+rpl :body App(:f :listB)
+rpl :f    App(:f :listA)
+rpl :f IdExp($merge)
+rpl :listA App(:f :a)    -- mergesort left
+rpl :f IdExp($mergesort)
+rpl :a IdExp($left)
+rpl :listB App(:f :a)    -- mergesort right
+rpl :f IdExp($mergesort)
+rpl :a IdExp($right)
+
+-- :caseOne // Nil -> ls
+rpl :caseOne Lambda($_ :body)
+rpl :body IdExp($ls)
+
+-- :caseEmpty // Nil -> Nil
+rpl :caseEmpty Lambda($_ :body)
+rpl :body IdExp($Nil)
