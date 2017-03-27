@@ -1,0 +1,10 @@
+bnd :root $const :const
+
+rpl :const Lambda($x :body)
+rpl :body Num(1)
+
+rpl :main App(:f :a)
+rpl :f IdExp($const)
+rpl :a App(:f :a)
+rpl :f IdExp($const)
+rpl :a IdExp($True)

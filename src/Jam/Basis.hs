@@ -13,7 +13,7 @@ import Jam.Ast
 import Jam.Accessors
 
 (basis, basisProg) = runState makeBasis _p
-  where _p = Prog { root = BottomExp (TyVarType $ TyVar 0) IM.empty
+  where _p = Prog { root = BottomExp (TyVarType $ TyVar 0 [RootExpPath]) IM.empty
                   , rootBindings = IM.empty
                   , tydefs = []
                   , tyvarMap = M.empty

@@ -52,13 +52,13 @@ runCmd p env (BndCmd scopeName (IdName idName) valName) =
       (mi, newProg) <- fromJamE $ runStateT (bind idName path) p
       case mi of
         Nothing -> return (newProg, env)
-        Just ident -> return (
+        Just ident@(Id u s t) -> return (
                         newProg,
                         bindIdName
                           (bindExpName env valName $ appendExpPath path $
                             BindingExpPath ident RootExpPath)
                           (IdName idName)
-                          ident
+                          (Id u s (prependScopes path t))
                       )
 runCmd p env (RplCmd expName expCreator) =
   case lookup expName $ expNames env of
@@ -78,13 +78,13 @@ useCreator _ env CrUnit = do e <- liftState createUnit
 useCreator _ env (CrNum x) = do e <- liftState $ createNum x
                                 return (e, env)
 useCreator path env (CrLambda (IdName idName) expName) = do
-  e@(LambdaExp _ _ argId _ _) <- liftState $ createLambda idName
+  e@(LambdaExp _ _ (Id u s t) _ _) <- liftState $ createLambda idName
   return (
     e,
     bindIdName (bindExpName env expName $
                   appendExpPath path $
                     ChildExpPath LambdaBodyIndex endExpPath)
-               (IdName idName) argId )
+               (IdName idName) (Id u s (prependScopes path t)) )
 useCreator path env (CrApp funcName argName) = do
   e <- liftState createApp
   return (
@@ -120,10 +120,6 @@ typCmdToTyDefs env tdds = do
                                         (tdn, TyDef u n 0 []))
                                 (zip tdUs tdds)
   tyDefs <- mapM (tyDefDescToTyDef env curTdMap) (zip tdUs tdds)
-  -- update tydefs
-  -- let recursiveTyDefs = _updateRecTyDefs tdUs recursiveTyDefs tyDefs
-
-  -- bind tycon identifiers
   newEnv <- bindTyConIds tyDefs env
   return (newEnv, tyDefs)
 
@@ -132,7 +128,7 @@ bindTyConIds [] env = return env
 bindTyConIds (td@(TyDef _ name _ tcs):tds) env = do
   u1 <- liftState getUnique
   u2 <- liftState getUnique
-  deconT <- lift $ deconType td (TyVar u1)
+  deconT <- lift $ deconType td (TyVar u1 [])
   let deconName = name ++ ".Decon"
       deconId = Id u2 deconName deconT
   p <- get
@@ -152,7 +148,7 @@ bindTyConIds (td@(TyDef _ name _ tcs):tds) env = do
         _bindTyconIds [] env = return env
 
 deconType :: TyDef -> TyVar -> ThrowsJtsError Type
-deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $
+deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $ UniversalType $
   TyDefType (functionType basis) [finalReturnType tcT, _deconClauseTypes tcs tv]
   where _deconClauseTypes tcs tv =
           typesToFuncType (map (\(TyCon _ _ t) ->
@@ -165,6 +161,7 @@ deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $
 deconType td _ = throwError $ EmptyTyDef td
 
 finalReturnType :: Type -> Type
+finalReturnType (UniversalType t) = finalReturnType t
 finalReturnType t@(TyDefType td paramTs)
   | td == (functionType basis) = finalReturnType (paramTs !! 1)
   | otherwise = t
@@ -178,6 +175,7 @@ conTyToDeconClauseType (TyDefType td paramTs) retTv
                                    conTyToDeconClauseType (paramTs !! 1) retTv
                                    ]
   | otherwise = TyVarType retTv
+conTyToDeconClauseType (UniversalType t) retTv = conTyToDeconClauseType t retTv
 
 tyDefDescToTyDef :: Env -> Map TyDefName TyDef -> (Unique, TyDefDesc)
                         -> StateThrowsJtsError TyDef
@@ -185,7 +183,7 @@ tyDefDescToTyDef env curTdMap
                  (u, (TyDefDesc tdn@(TyDefName name) tvns cds)) =
   do let arity = length tvns
      tvUs <- liftState $ getUniques arity
-     let tvs = map TyVar tvUs
+     let tvs = map (\u -> TyVar u []) tvUs
          tvMap = fromList $ zip tvns tvs
          td = curTdMap ! tdn
      tyCons <- mapM (consDefToTyCon env curTdMap tvMap td tvs) cds
@@ -200,8 +198,8 @@ consDefToTyCon :: Env -> Map TyDefName TyDef
 consDefToTyCon env curTdMap tvMap td tvs (ConsDef (IdName idName) tDescs) = do
   tcU <- liftState getUnique
   types <- lift $ mapM (tyDescToType env curTdMap tvMap) tDescs
-  return $ TyCon tcU idName (typesToFuncType types $
-                                 TyDefType td (map TyVarType tvs))
+  return $ TyCon tcU idName $ UniversalType $ (typesToFuncType types $
+                                              TyDefType td (map TyVarType tvs))
 
 tyDescToType :: Env -> Map TyDefName TyDef -> Map TyVarName TyVar -> TypeDesc
                     -> ThrowsJtsError Type

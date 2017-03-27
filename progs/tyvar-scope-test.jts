@@ -1,0 +1,5 @@
+bnd :root $f :f
+rpl :f Lambda($x :body)
+bnd :body $y :y
+rpl :y IdExp($x)
+rpl :body IdExp($y)

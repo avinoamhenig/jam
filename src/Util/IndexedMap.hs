@@ -6,7 +6,8 @@ module Util.IndexedMap (
   foldWithKey,
   fromList,
   (!),
-  getMap
+  getMap,
+  unionWith
 ) where
 
 import Prelude hiding (lookup)
@@ -55,3 +56,9 @@ fromList [] = empty
 fromList ((k,v):rest) = insert k v $ fromList rest
 
 im ! k = (kvMap im) Data.Map.! k
+
+unionWith ::  Ord k => (v -> v -> v) -> Map k v -> Map k v -> Map k v
+unionWith resolve a b = foldWithKey foldFn a b
+  where foldFn kb vb a = case lookup kb a of
+                          Just va -> insert kb (resolve va vb) a
+                          Nothing -> insert kb vb a

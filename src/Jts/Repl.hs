@@ -9,7 +9,7 @@ import Jts.Interpreter
 import Jam.Interpreter
 import Jam.Accessors
 import Jam.Basis
-import Data.Map
+import Data.Map hiding (map)
 import Prelude hiding (lookup)
 import System.Console.Haskeline
 import Control.Monad.Trans.Class (lift)
@@ -41,8 +41,9 @@ doCommand prog env (cmd:args)
                                        Left e -> outputStr $ (show e) ++ "\n\n"
                                        Right prog -> printProg $ (prog, env)
                                      repl prog env
-  | cmd == "t" || cmd == "typeof" =
+  | cmd == "t" || cmd == "typeof" || cmd == "it" =
     let (prefix:name) = args !! 0
+        initial = cmd == "it"
         t = if prefix /= ':'
             then let iname = if prefix == '$' then name else prefix:name
                  in case lookup (IdName iname) (idNames env) of
@@ -59,7 +60,21 @@ doCommand prog env (cmd:args)
     in do
       case t of
         Nothing -> outputStr "Expression or identifier does not exist\n\n"
-        Just t -> outputStr $ (deparen $ show (finalType prog t)) ++ "\n\n"
+        Just t -> outputStr $ (deparen $ show (if initial then t
+                                                else finalType prog t))
+                              ++ "\n\n"
+      repl prog env
+  | cmd == "c" || cmd == "constraints" =
+    let (prefix:_name) = args !! 0
+        name = if prefix == '@' then _name else prefix:name
+        u = (read name)::Int
+    in do
+      case lookupLE (TyVar u []) (tyvarMap prog) of
+        Nothing -> outputStr "Type-variable is unconstrained\n\n"
+        Just ((TyVar u' scopes), t) -> --error "hi"
+          if u' /= u then outputStr "Type-variable is unconstrained\n\n"
+            else outputStr ("|-> " ++ (show t) ++ "\n" ++
+                            (unlines (map show scopes)) ++ "\n\n")
       repl prog env
 doCommand prog env _ = do outputStr "Unrecognized command.\n"
                           repl prog env

@@ -13,9 +13,12 @@ module Jam.Ast (
   getUniques,
   deparen,
   Unique,
-  Env
+  Env,
+  ExpPath (..), endExpPath,
+  ChildExpIndex (..),
 ) where
 
+import Prelude hiding (lookup)
 import qualified Util.IndexedMap
 import Data.Map
 import Control.Monad.State
@@ -29,6 +32,21 @@ data Prog = Prog { root :: Exp
                  , tyvarMap :: Map TyVar Type
                  , uniqC :: Unique
                  }
+
+data ExpPath = RootExpPath
+             | RootBindingExpPath Id ExpPath
+             | BindingExpPath Id ExpPath
+             | ChildExpPath ChildExpIndex ExpPath
+             deriving (Eq, Show)
+endExpPath = RootExpPath
+
+data ChildExpIndex = LambdaBodyIndex
+                   | AppFuncIndex
+                   | AppArgIndex
+                   | IfCondIndex
+                   | IfThenIndex
+                   | IfElseIndex
+                   deriving (Eq, Show)
 
 getUnique :: State Prog Unique
 getUnique = do p <- get
@@ -51,8 +69,10 @@ instance Show Id where show (Id _ name _) = name
 instance Eq Id where (Id u1 _ _) == (Id u2 _ _) = u1 == u2
 instance Ord Id where (Id u1 _ _) `compare` (Id u2 _ _) = u1 `compare` u2
 
-data TyVar = TyVar Unique deriving (Ord, Eq)
-instance Show TyVar where show (TyVar u) = "@" ++ (show u)
+data TyVar = TyVar Unique [ExpPath]
+instance Show TyVar where show (TyVar u _) = "@" ++ (show u)
+instance Eq TyVar where (TyVar u1 _) == (TyVar u2 _) = u1 == u2
+instance Ord TyVar where (TyVar u1 _) `compare` (TyVar u2 _) = u1 `compare` u2
 
 type Arity = Int
 data TyDef = TyDef Unique String Arity [TyCon]
@@ -64,19 +84,22 @@ instance Eq TyCon where (TyCon u1 _ _) == (TyCon u2 _ _) = u1 == u2
 
 data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
+          | UniversalType Type
 instance Show Type where
   show (TyVarType tv) = show tv
   show (TyDefType td params)
     | show td == "->" =
-        let rt = if isFnType (params !! 1)
-                 then deparen (show $ params !! 1)
-                 else show $ params !! 1
-        in "(" ++ (show $ params !! 0) ++ " -> " ++ rt ++ ")"
+        let rt = deparen (show $ params !! 1)
+            at = if isFnType (params !! 0)
+                  then show (params !! 0)
+                  else deparen $ show (params !! 0)
+        in "(" ++ at ++ " -> " ++ rt ++ ")"
     | length params > 0 = "("
                ++ (show td) ++ " "
                ++ unwords (show <$> params)
                ++ ")"
     | otherwise = show td
+  show (UniversalType t) = "∀(" ++ (deparen $ show t) ++ ")"
 
 isFnType :: Type -> Bool
 isFnType (TyDefType td _) = (show td) == "->"

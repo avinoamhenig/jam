@@ -1,6 +1,4 @@
 module Jam.Accessors (
-  ExpPath (..), endExpPath,
-  ChildExpIndex (..),
   appendExpPath,
   parentExpPath,
   childExp,
@@ -55,21 +53,6 @@ getBindings e = case e of
   IfExp _ binds _ _ _ -> binds
   BuiltInExp _ -> empty
   BuiltInRef _ -> empty
-
-data ExpPath = RootExpPath
-             | RootBindingExpPath Id ExpPath
-             | BindingExpPath Id ExpPath
-             | ChildExpPath ChildExpIndex ExpPath
-             deriving (Eq, Show)
-endExpPath = RootExpPath
-
-data ChildExpIndex = LambdaBodyIndex
-                   | AppFuncIndex
-                   | AppArgIndex
-                   | IfCondIndex
-                   | IfThenIndex
-                   | IfElseIndex
-                   deriving (Eq, Show)
 
 isInsideBinding :: ExpPath -> Id -> Bool
 isInsideBinding RootExpPath _ = False
@@ -184,3 +167,4 @@ finalType p (TyVarType tv) = case Map.lookup tv (tyvarMap p) of
   Nothing -> TyVarType tv
   Just t -> finalType p t
 finalType p (TyDefType td params) = TyDefType td $ (finalType p) <$> params
+finalType p (UniversalType t) = UniversalType $ finalType p t

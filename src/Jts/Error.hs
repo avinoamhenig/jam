@@ -8,7 +8,6 @@ module Jts.Error (
 
 import Jts.Ast
 import Jam.Ast
-import Jam.Accessors (ExpPath)
 import Jam.Error
 import Control.Monad.State
 import Control.Monad.Except

@@ -6,7 +6,6 @@ module Jam.Error (
 ) where
 
 import Jam.Ast
-import Jam.Accessors (ExpPath)
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Identity

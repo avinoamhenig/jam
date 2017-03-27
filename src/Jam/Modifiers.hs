@@ -1,13 +1,14 @@
 module Jam.Modifiers (
   replace,
   bind,
-  addTyDef
+  addTyDef,
+  setType,
+  prependScopes
 ) where
 
 import Prelude hiding (lookup)
 import Jam.Ast
 import Jam.Accessors
-import Jam.Basis
 import Util.IndexedMap
 import qualified Data.Map as M
 import Control.Monad.State
@@ -22,11 +23,13 @@ bind idName scopePath = do
   prog <- get
   case expAtPath prog scopePath of
     Nothing -> return Nothing
-    Just e -> do t <- liftState $ (TyVarType . TyVar) <$> getUnique
-                 u <- liftState $ getUnique
-                 let ident = Id u idName t
+    Just e -> do u1 <- liftState getUnique
+                 u2 <- liftState getUnique
+                 let t = TyVarType $ TyVar u1 [appendExpPath scopePath $
+                                               BindingExpPath ident RootExpPath]
+                     ident = Id u2 idName (UniversalType t)
                  prog <- get
-                 prog <- lift $ replace prog scopePath $
+                 prog <- lift . return $ _replace prog scopePath $
                                   _bind ident (ExpVal $ BottomExp t empty) e
                  put prog
                  return $ Just ident
@@ -50,54 +53,30 @@ _replaceSubExp orig (ChildExpPath index path) new =
       Nothing -> orig
       Just setter -> setter $ _replaceSubExp child path new
 
-
-copyType :: Type -> State Prog Type
-copyType ty = do (newT, _) <- _copyType ty M.empty
-                 return newT
-  where _copyType (TyVarType tv) tvMap =
-            case M.lookup tv tvMap of
-              Nothing -> do u <- getUnique
-                            let newT = TyVarType (TyVar u)
-                            return $ (newT, M.insert tv newT tvMap)
-              Just newT -> return $ (newT, tvMap)
-
-        _copyType (TyDefType td paramTs) tvMap = do
-            (newParamTs, newTvMap) <- copyParamTypes paramTs tvMap
-            return (TyDefType td newParamTs, newTvMap)
-        copyParamTypes [] tvMap = return ([], tvMap)
-        copyParamTypes (t:ts) tvMap = do
-          (newT , newTvMap) <- _copyType t tvMap
-          (newTs, newTvMap) <- copyParamTypes ts newTvMap
-          return (newT:newTs, newTvMap)
+_replace :: Prog -> ExpPath -> Exp -> Prog
+_replace p (RootBindingExpPath i path) new = p {
+  rootBindings = case lookup i $ rootBindings p of
+    Nothing -> rootBindings p
+    Just bv -> case bv of
+      ExpVal orig -> insert i (ExpVal $ _replaceSubExp orig path new) $
+                      rootBindings p
+      _ -> rootBindings p
+  }
+_replace p path new = p { root = _replaceSubExp (root p) path new }
 
 replace :: Prog -> ExpPath -> Exp -> ThrowsJamError Prog
 replace p path r =
   case expAtPath p path of
     Nothing -> throwError $ BadExpPath path
     Just e ->
-      let (newTy, newProg) =
-            case r of IdExp ty _ ident ->
-                        if isTyCon ident
-                           || ((isFunctionType $ finalType p ty) &&
-                               (not $ isInsideBinding path ident))
-                           then runState (copyType $ finalType p ty) p
-                           else (getType r, p)
-                      _ ->      (getType r, p)
-          _r = setType r newTy
-          (unifies, newestProg) = runState (unify (getType e) (getType _r))
-                                           newProg
-      in if unifies then return $ _replace newestProg path _r
-                    else throwError $ TypeMismatch (getType e) (getType _r)
-  where
-    _replace p (RootBindingExpPath i path) new = p {
-      rootBindings = case lookup i $ rootBindings p of
-        Nothing -> rootBindings p
-        Just bv -> case bv of
-          ExpVal orig -> insert i (ExpVal $ _replaceSubExp orig path new) $
-                          rootBindings p
-          _ -> rootBindings p
-      }
-    _replace p path new = p { root = _replaceSubExp (root p) path new }
+      let newR = setBindings (prependPathToFrag path r)
+                             (unionWith (\_ b -> b) (getBindings e)
+                                                    (getBindings r))
+          (unifies, newProg) = runState (unify (getType e) (getType newR)) p
+      in if unifies
+          then return $ _replace newProg path newR
+          else throwError $ TypeMismatch (finalType p $ getType e)
+                                         (finalType p $ getType r)
 
 unify :: Type -> Type -> State Prog Bool
 unify t1 t2 = do p <- get
@@ -105,8 +84,9 @@ unify t1 t2 = do p <- get
                  when (not unifies) $ put p
                  return unifies
   where
-    _unify (TyVarType tv1) (TyVarType tv2) = do
-      t3 <- (TyVarType . TyVar) <$> getUnique
+    _unify (TyVarType tv1@(TyVar _ s1)) (TyVarType tv2@(TyVar _ s2)) = do
+      u <- getUnique
+      let t3 = TyVarType $ TyVar u (s1 ++ s2)
       p <- get
       when (tv1 /= tv2) $ put $ p { tyvarMap = M.insert tv1 t3 $
                                                  M.insert tv2 t3 $ tyvarMap p }
@@ -123,6 +103,7 @@ unify t1 t2 = do p <- get
       if td1 /= td2
       then return False
       else _unifyLists ps1 ps2
+    _unify _ _ = error "Trying to unify general types."
 
     _unifyLists [] [] = return True
     _unifyLists (t1:ps1) (t2:ps2) = do
@@ -135,6 +116,19 @@ unify t1 t2 = do p <- get
 typeContainsVar :: TyVar -> Type -> Bool
 typeContainsVar tv (TyVarType tv') = tv' == tv
 typeContainsVar tv (TyDefType _ ts) = any (typeContainsVar tv) ts
+typeContainsVar tv (UniversalType t) = typeContainsVar tv t
+
+setBindings :: Exp -> Bindings -> Exp
+setBindings e binds = case e of
+  BottomExp t _ -> BottomExp t binds
+  UnitExp t _ -> UnitExp t binds
+  NumExp t _ val -> NumExp t binds val
+  IdExp t _ ident -> IdExp t binds ident
+  LambdaExp t _ arg body cEnv -> LambdaExp t binds arg body cEnv
+  AppExp t _ func arg -> AppExp t binds func arg
+  IfExp t _ cExp tExp eExp -> IfExp t binds cExp tExp eExp
+  BuiltInExp _ -> e
+  BuiltInRef _ -> e
 
 setType :: Exp -> Type -> Exp
 setType e t = case e of
@@ -148,14 +142,24 @@ setType e t = case e of
   BuiltInExp _ -> e
   BuiltInRef _ -> e
 
-setBindings :: Exp -> Bindings -> Exp
-setBindings e binds = case e of
-  BottomExp t _ -> BottomExp t binds
-  UnitExp t _ -> UnitExp t binds
-  NumExp t _ val -> NumExp t binds val
-  IdExp t _ ident -> IdExp t binds ident
-  LambdaExp t _ arg body cEnv -> LambdaExp t binds arg body cEnv
-  AppExp t _ func arg -> AppExp t binds func arg
-  IfExp t _ cExp tExp eExp -> IfExp t binds cExp tExp eExp
-  BuiltInExp _ -> e
-  BuiltInRef _ -> e
+-- Prepends the given path to the scopes of ALL tyvars in the given type.
+prependScopes :: ExpPath -> Type -> Type
+prependScopes path (TyVarType (TyVar u scopes)) =
+  TyVarType $ TyVar u $ map (appendExpPath path) scopes
+prependScopes path (TyDefType td paramTs) =
+  TyDefType td $ map (prependScopes path) paramTs
+prependScopes path (UniversalType t) = UniversalType $ prependScopes path t
+
+-- TODO understand this better
+prependPathToFrag :: ExpPath -> Exp -> Exp
+prependPathToFrag path (BottomExp t bs) = BottomExp (prependScopes path t) bs
+prependPathToFrag path (LambdaExp t bs (Id u s at) e ce) =
+  LambdaExp (prependScopes path t) bs (Id u s (prependScopes path at))
+            (prependPathToFrag path e) ce
+prependPathToFrag path (AppExp t bs f a) =
+  AppExp (prependScopes path t) bs (prependPathToFrag path f)
+         (prependPathToFrag path a)
+prependPathToFrag path (IfExp t bs ce te ee) =
+  IfExp (prependScopes path t) bs (prependPathToFrag path ce)
+        (prependPathToFrag path te) (prependPathToFrag path ee)
+prependPathToFrag _ e = e

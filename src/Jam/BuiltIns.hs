@@ -3,6 +3,7 @@ module Jam.BuiltIns (
 ) where
 
 import Data.Map
+import qualified Util.IndexedMap as IM
 import Jam.Ast
 import Jam.Creators
 import Jam.Basis
@@ -23,8 +24,9 @@ builtInFuncs = fromList [
 
 b2 f = BuiltInExp (\x -> BuiltInExp $ f x)
 
-true  = createIdExp' $ (basisIds basis) ! "True"
-false = createIdExp' $ (basisIds basis) ! "False"
+boolT = (TyDefType $ boolType basis) []
+true  = IdExp boolT IM.empty $ (basisIds basis) ! "True"
+false = IdExp boolT IM.empty $ (basisIds basis) ! "False"
 
 -- TODO: take a look at this. should builtins be able to throw errors?
 numVal (NumExp _ _ v) = v

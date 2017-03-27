@@ -1,0 +1,5 @@
+bnd :root $f :f
+rpl :f Lambda($x :body)
+rpl :body App(:f1 :a)
+rpl :f1 IdExp($f)
+rpl :a Num(0)
