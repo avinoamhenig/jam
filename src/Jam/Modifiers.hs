@@ -9,6 +9,7 @@ module Jam.Modifiers (
 import Prelude hiding (lookup)
 import Jam.Ast
 import Jam.Accessors
+import Jam.Creators
 import Util.IndexedMap
 import qualified Data.Map as M
 import qualified Data.Set as Set
@@ -28,7 +29,7 @@ bind idName scopePath = do
                  u2 <- liftState getUnique
                  let t = TyVarType $ TyVar u1 [appendExpPath scopePath $
                                                BindingExpPath ident RootExpPath]
-                     ident = Id u2 idName (UniversalType t)
+                     ident = Id u2 idName (UniversalType t ident)
                  prog <- get
                  prog <- lift . return $ _replace prog scopePath $
                                   _bind ident (ExpVal $ BottomExp t empty) e
@@ -108,8 +109,9 @@ unify t1 t2 = do p <- get
     _mapTv :: TyVar -> Type -> State Prog Bool
     _mapTv tv t = do
       modify (\p -> p { tyVarMap = M.insert tv t (tyVarMap p) })
+      instT <- instantiateType t
       p <- get
-      bs <- mapM ((_unify t) . (finalType p) .TyVarType)
+      bs <- mapM ((_unify instT) . (finalType p) .TyVarType)
                  (Set.toList $ M.findWithDefault Set.empty tv (univTyVarMap p))
       return $ all id bs
 
@@ -125,7 +127,7 @@ unify t1 t2 = do p <- get
 typeContainsVar :: TyVar -> Type -> Bool
 typeContainsVar tv (TyVarType tv') = tv' == tv
 typeContainsVar tv (TyDefType _ ts) = any (typeContainsVar tv) ts
-typeContainsVar tv (UniversalType t) = typeContainsVar tv t
+typeContainsVar tv (UniversalType t _) = typeContainsVar tv t
 
 setBindings :: Exp -> Bindings -> Exp
 setBindings e binds = case e of
@@ -157,7 +159,7 @@ prependScopes path (TyVarType (TyVar u scopes)) =
   TyVarType $ TyVar u $ map (appendExpPath path) scopes
 prependScopes path (TyDefType td paramTs) =
   TyDefType td $ map (prependScopes path) paramTs
-prependScopes path (UniversalType t) = UniversalType $ prependScopes path t
+prependScopes path (UniversalType t i) = UniversalType (prependScopes path t) i
 
 prependPathToFrag :: ExpPath -> Exp -> Exp
 prependPathToFrag path (BottomExp t bs) = BottomExp (prependScopes path t) bs

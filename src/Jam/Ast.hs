@@ -16,13 +16,16 @@ module Jam.Ast (
   Env,
   ExpPath (..), endExpPath,
   ChildExpIndex (..),
+  tyVars,
+  isInsideBinding
 ) where
 
 import Prelude hiding (lookup)
 import qualified Util.IndexedMap
-import Data.Map
+import Data.Map (Map)
 import Data.Set (Set)
 import Control.Monad.State
+import Data.List (intercalate)
 
 type Bindings = Util.IndexedMap.Map Id BindingVal
 type Unique = Int
@@ -49,6 +52,16 @@ data ChildExpIndex = LambdaBodyIndex
                    | IfThenIndex
                    | IfElseIndex
                    deriving (Eq, Show)
+
+isInsideBinding :: ExpPath -> Id -> Bool
+isInsideBinding RootExpPath _ = False
+isInsideBinding (ChildExpPath _ childPath) i = isInsideBinding childPath i
+isInsideBinding (RootBindingExpPath i' childPath) i
+  | i == i' = True
+  | otherwise = isInsideBinding childPath i
+isInsideBinding (BindingExpPath i' childPath) i
+  | i == i' = True
+  | otherwise = isInsideBinding childPath i
 
 getUnique :: State Prog Unique
 getUnique = do p <- get
@@ -86,7 +99,13 @@ instance Eq TyCon where (TyCon u1 _ _) == (TyCon u2 _ _) = u1 == u2
 
 data Type = TyDefType TyDef [Type]
           | TyVarType TyVar
-          | UniversalType Type
+          | UniversalType Type Id
+
+tyVars :: Type -> [TyVar]
+tyVars (TyVarType tv) = [tv]
+tyVars (TyDefType _ ts) = concat $ map tyVars ts
+tyVars (UniversalType t _) = tyVars t
+
 instance Show Type where
   show (TyVarType tv) = show tv
   show (TyDefType td params)
@@ -101,7 +120,11 @@ instance Show Type where
                ++ unwords (show <$> params)
                ++ ")"
     | otherwise = show td
-  show (UniversalType t) = "∀(" ++ (deparen $ show t) ++ ")"
+  show (UniversalType t i) =
+    let f = (\(TyVar _ scopes) -> all (\path -> isInsideBinding path i) scopes)
+        uTvs = filter f (tyVars t)
+    in "∀" ++ (intercalate "," (map show uTvs))
+           ++ ".(" ++ (deparen $ show t) ++ ")"
 
 isFnType :: Type -> Bool
 isFnType (TyDefType td _) = (show td) == "->"

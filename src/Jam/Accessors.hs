@@ -11,7 +11,6 @@ module Jam.Accessors (
   arity,
   getType,
   getBindings,
-  isInsideBinding,
   isTyCon
 ) where
 
@@ -53,16 +52,6 @@ getBindings e = case e of
   IfExp _ binds _ _ _ -> binds
   BuiltInExp _ -> empty
   BuiltInRef _ -> empty
-
-isInsideBinding :: ExpPath -> Id -> Bool
-isInsideBinding RootExpPath _ = False
-isInsideBinding (ChildExpPath _ childPath) i = isInsideBinding childPath i
-isInsideBinding (RootBindingExpPath i' childPath) i
-  | i == i' = True
-  | otherwise = isInsideBinding childPath i
-isInsideBinding (BindingExpPath i' childPath) i
-  | i == i' = True
-  | otherwise = isInsideBinding childPath i
 
 appendExpPath :: ExpPath -> ExpPath -> ExpPath
 appendExpPath RootExpPath p2 = p2
@@ -167,4 +156,4 @@ finalType p (TyVarType tv) = case Map.lookup tv (tyVarMap p) of
   Nothing -> TyVarType tv
   Just t -> finalType p t
 finalType p (TyDefType td params) = TyDefType td $ (finalType p) <$> params
-finalType p (UniversalType t) = UniversalType $ finalType p t
+finalType p (UniversalType t i) = UniversalType (finalType p t) i

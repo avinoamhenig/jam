@@ -113,6 +113,8 @@ useCreator path env (CrIdExp idName@(IdName name)) = do
       Nothing -> lift $ throwError $ IdOutOfScope idName path
       Just ident -> (liftState $ createIdExp ident) >>= \e -> return (e, env)
 
+_bogusId = Id maxBound "" (TyVarType (TyVar maxBound [])) -- HACK
+
 typCmdToTyDefs :: Env -> [TyDefDesc] -> StateThrowsJtsError (Env, [TyDef])
 typCmdToTyDefs env tdds = do
   tdUs <- liftState $ getUniques (length tdds)
@@ -148,8 +150,11 @@ bindTyConIds (td@(TyDef _ name _ tcs):tds) env = do
         _bindTyconIds [] env = return env
 
 deconType :: TyDef -> TyVar -> ThrowsJtsError Type
-deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $ UniversalType $
-  TyDefType (functionType basis) [finalReturnType tcT, _deconClauseTypes tcs tv]
+deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv =
+  return $ UniversalType (TyDefType (functionType basis)
+                                    [finalReturnType tcT,
+                                     _deconClauseTypes tcs tv])
+                         _bogusId
   where _deconClauseTypes tcs tv =
           typesToFuncType (map (\(TyCon _ _ t) ->
                                   _wrapInFnTy $ conTyToDeconClauseType t tv)
@@ -161,7 +166,7 @@ deconType (TyDef _ _ _ tcs@((TyCon _ _ tcT):_)) tv = return $ UniversalType $
 deconType td _ = throwError $ EmptyTyDef td
 
 finalReturnType :: Type -> Type
-finalReturnType (UniversalType t) = finalReturnType t
+finalReturnType (UniversalType t _) = finalReturnType t
 finalReturnType t@(TyDefType td paramTs)
   | td == (functionType basis) = finalReturnType (paramTs !! 1)
   | otherwise = t
@@ -175,7 +180,7 @@ conTyToDeconClauseType (TyDefType td paramTs) retTv
                                    conTyToDeconClauseType (paramTs !! 1) retTv
                                    ]
   | otherwise = TyVarType retTv
-conTyToDeconClauseType (UniversalType t) retTv = conTyToDeconClauseType t retTv
+conTyToDeconClauseType (UniversalType t _) rTv = conTyToDeconClauseType t rTv
 
 tyDefDescToTyDef :: Env -> Map TyDefName TyDef -> (Unique, TyDefDesc)
                         -> StateThrowsJtsError TyDef
@@ -198,8 +203,10 @@ consDefToTyCon :: Env -> Map TyDefName TyDef
 consDefToTyCon env curTdMap tvMap td tvs (ConsDef (IdName idName) tDescs) = do
   tcU <- liftState getUnique
   types <- lift $ mapM (tyDescToType env curTdMap tvMap) tDescs
-  return $ TyCon tcU idName $ UniversalType $ (typesToFuncType types $
-                                              TyDefType td (map TyVarType tvs))
+  return $ TyCon tcU idName $ UniversalType ((typesToFuncType types $
+                                             TyDefType td (map TyVarType tvs)))
+                                            _bogusId
+
 
 tyDescToType :: Env -> Map TyDefName TyDef -> Map TyVarName TyVar -> TypeDesc
                     -> ThrowsJtsError Type

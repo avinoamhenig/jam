@@ -4,7 +4,8 @@ module Jam.Creators (
   createLambda,
   createIdExp,
   createApp,
-  createIf
+  createIf,
+  instantiateType
 ) where
 
 import Util.IndexedMap
@@ -44,7 +45,7 @@ createLambda argName = do
 
 createIdExp :: Id -> State Prog Exp
 createIdExp i@(Id _ _ t) = do
-  newType <- instantiateTypeForId i t
+  newType <- instantiateType t
   return $ IdExp newType empty i
 
 createApp :: State Prog Exp
@@ -68,8 +69,8 @@ createIf = do
                  (_btm t) -- then
                  (_btm t) -- else
 
-instantiateTypeForId :: Id -> Type -> State Prog Type
-instantiateTypeForId ident (UniversalType t) =
+instantiateType :: Type -> State Prog Type
+instantiateType (UniversalType t ident) =
   do p <- get
      (newT, newTvMap) <- _copyVars (finalType p t) M.empty
      _ <- mapM (\(utv, ntv) -> modify
@@ -92,10 +93,10 @@ instantiateTypeForId ident (UniversalType t) =
         _copyVars (TyDefType td paramTs) tvMap = do
           (newParamTs, newTvMap) <- copyParamTypes paramTs tvMap
           return (TyDefType td newParamTs, newTvMap)
-        _copyVars t@(UniversalType _) tvMap = return (t, tvMap)
+        _copyVars t@(UniversalType _ _) tvMap = return (t, tvMap)
         copyParamTypes [] tvMap = return ([], tvMap)
         copyParamTypes (t:ts) tvMap = do
           (newT , newTvMap) <- _copyVars t tvMap
           (newTs, newTvMap) <- copyParamTypes ts newTvMap
           return (newT:newTs, newTvMap)
-instantiateTypeForId _ t = return t
+instantiateType t = return t
