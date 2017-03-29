@@ -16,7 +16,8 @@ import Jam.Accessors
   where _p = Prog { root = BottomExp (TyVarType $ TyVar 0 [RootExpPath]) IM.empty
                   , rootBindings = IM.empty
                   , tydefs = []
-                  , tyvarMap = M.empty
+                  , tyVarMap = M.empty
+                  , univTyVarMap = M.empty
                   , uniqC = 1
                   }
 

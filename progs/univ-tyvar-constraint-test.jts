@@ -1,0 +1,8 @@
+-- tests universal type-variable constraints
+bnd :root $x :x
+rpl :root App(:f :a)
+rpl :f App(:f :a0)
+rpl :f IdExp($+)
+rpl :a0 Num(1)
+rpl :a IdExp($x)
+rpl :x IdExp($True)

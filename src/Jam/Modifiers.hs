@@ -11,6 +11,7 @@ import Jam.Ast
 import Jam.Accessors
 import Util.IndexedMap
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import Control.Monad.State
 import Control.Monad.Except (throwError)
 import Jam.Error
@@ -84,20 +85,19 @@ unify t1 t2 = do p <- get
                  when (not unifies) $ put p
                  return unifies
   where
+    _unify :: Type -> Type -> State Prog Bool
     _unify (TyVarType tv1@(TyVar _ s1)) (TyVarType tv2@(TyVar _ s2)) = do
       u <- getUnique
       let t3 = TyVarType $ TyVar u (s1 ++ s2)
-      p <- get
-      when (tv1 /= tv2) $ put $ p { tyvarMap = M.insert tv1 t3 $
-                                                 M.insert tv2 t3 $ tyvarMap p }
-      return True
+      if tv1 == tv2 then return True
+                    else do b1 <- _mapTv tv1 t3
+                            b2 <- _mapTv tv2 t3
+                            return (b1 && b2)
     _unify (TyVarType tv) t2 = do
-      p <- get
-      if typeContainsVar tv t2
+      if typeContainsVar tv t2 -- occurs check (for cyclic types)
         then return False
-        else do
-          put $ p { tyvarMap = M.insert tv t2 $ tyvarMap p }
-          return True
+        else do b <- _mapTv tv t2
+                return b
     _unify t2 t1@(TyVarType _) = _unify t1 t2
     _unify (TyDefType td1 ps1) (TyDefType td2 ps2) =
       if td1 /= td2
@@ -105,6 +105,15 @@ unify t1 t2 = do p <- get
       else _unifyLists ps1 ps2
     _unify _ _ = error "Trying to unify general types."
 
+    _mapTv :: TyVar -> Type -> State Prog Bool
+    _mapTv tv t = do
+      modify (\p -> p { tyVarMap = M.insert tv t (tyVarMap p) })
+      p <- get
+      bs <- mapM ((_unify t) . (finalType p) .TyVarType)
+                 (Set.toList $ M.findWithDefault Set.empty tv (univTyVarMap p))
+      return $ all id bs
+
+    _unifyLists :: [Type] -> [Type] -> State Prog Bool
     _unifyLists [] [] = return True
     _unifyLists (t1:ps1) (t2:ps2) = do
       p <- get
@@ -150,7 +159,6 @@ prependScopes path (TyDefType td paramTs) =
   TyDefType td $ map (prependScopes path) paramTs
 prependScopes path (UniversalType t) = UniversalType $ prependScopes path t
 
--- TODO understand this better
 prependPathToFrag :: ExpPath -> Exp -> Exp
 prependPathToFrag path (BottomExp t bs) = BottomExp (prependScopes path t) bs
 prependPathToFrag path (LambdaExp t bs (Id u s at) e ce) =

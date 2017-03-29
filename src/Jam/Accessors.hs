@@ -163,7 +163,7 @@ childExpSetter IfElseIndex (IfExp ty binds condExp thenExp _) =
 childExpSetter _ _ = Nothing
 
 finalType :: Prog -> Type -> Type
-finalType p (TyVarType tv) = case Map.lookup tv (tyvarMap p) of
+finalType p (TyVarType tv) = case Map.lookup tv (tyVarMap p) of
   Nothing -> TyVarType tv
   Just t -> finalType p t
 finalType p (TyDefType td params) = TyDefType td $ (finalType p) <$> params

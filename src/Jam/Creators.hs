@@ -13,6 +13,7 @@ import Jam.Accessors
 import Jam.Basis
 import Control.Monad.State
 import qualified Data.Map as M
+import qualified Data.Set as Set
 
 _btm t = BottomExp t empty
 
@@ -70,16 +71,24 @@ createIf = do
 instantiateTypeForId :: Id -> Type -> State Prog Type
 instantiateTypeForId ident (UniversalType t) =
   do p <- get
-     (newT, _) <- _copyVars (finalType p t) M.empty
+     (newT, newTvMap) <- _copyVars (finalType p t) M.empty
+     _ <- mapM (\(utv, ntv) -> modify
+                (\p -> p { univTyVarMap =
+                            M.insert utv (Set.insert ntv $
+                                          M.findWithDefault Set.empty utv $
+                                            univTyVarMap p)
+                                         (univTyVarMap p) }))
+               (M.foldrWithKey (\k v l -> (k, v):l) [] newTvMap)
      return newT
   where _copyVars t@(TyVarType tv@(TyVar _ scopes)) tvMap =
           if any (\path -> not $ isInsideBinding path ident) scopes
             then return (t, tvMap)
             else case M.lookup tv tvMap of
                   Nothing -> do u <- getUnique
-                                let newT = TyVarType (TyVar u [RootExpPath])
-                                return $ (newT, M.insert tv newT tvMap)
-                  Just newT -> return $ (newT, tvMap)
+                                let newTv = TyVar u [RootExpPath]
+                                    newT  = TyVarType newTv
+                                return $ (newT, M.insert tv newTv tvMap)
+                  Just newTv -> return $ (TyVarType newTv, tvMap)
         _copyVars (TyDefType td paramTs) tvMap = do
           (newParamTs, newTvMap) <- copyParamTypes paramTs tvMap
           return (TyDefType td newParamTs, newTvMap)

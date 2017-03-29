@@ -14,6 +14,7 @@ import Prelude hiding (lookup)
 import System.Console.Haskeline
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Except (runExcept)
+import qualified Data.Set as Set
 
 main :: IO ()
 main = runInputT defaultSettings $ repl makeProgram makeEnv
@@ -66,16 +67,24 @@ doCommand prog env (cmd:args)
       repl prog env
   | cmd == "c" || cmd == "constraints" =
     let (prefix:_name) = args !! 0
-        name = if prefix == '@' then _name else prefix:name
-        u = (read name)::Int
+        name = if prefix == '@' then _name else prefix:_name
+        u' = (reads name)::[(Int, String)]
     in do
-      case lookupLE (TyVar u []) (tyvarMap prog) of
-        Nothing -> outputStr "Type-variable is unconstrained\n\n"
-        Just ((TyVar u' scopes), t) -> --error "hi"
-          if u' /= u then outputStr "Type-variable is unconstrained\n\n"
-            else outputStr ("|-> " ++ (show t) ++ "\n" ++
-                            (unlines (map show scopes)) ++ "\n\n")
+      when ((length u') == 0) $ do outputStr "Invalid type-variable name\n\n"
+                                   repl prog env
+      let (u, _) = u' !! 0
+      case lookup (TyVar u []) (tyVarMap prog) of
+        Nothing -> outputStr ""
+        Just t -> outputStr ("@" ++ name ++ " |-> " ++ (show t) ++ "\n")
+      case lookup (TyVar u []) (univTyVarMap prog) of
+        Nothing -> outputStr ""
+        Just constrs -> outputStr $ unlines (map (_showConstr u prog)
+                                                 (Set.toList constrs))
+      outputStr "\n"
       repl prog env
+  where _showConstr u p ntv =
+          (show (finalType p (TyVarType (TyVar u [])))) ++ " => "
+            ++ (show (finalType p (TyVarType ntv)))
 doCommand prog env _ = do outputStr "Unrecognized command.\n"
                           repl prog env
 

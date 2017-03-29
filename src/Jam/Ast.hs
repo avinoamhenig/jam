@@ -21,6 +21,7 @@ module Jam.Ast (
 import Prelude hiding (lookup)
 import qualified Util.IndexedMap
 import Data.Map
+import Data.Set (Set)
 import Control.Monad.State
 
 type Bindings = Util.IndexedMap.Map Id BindingVal
@@ -29,7 +30,8 @@ type Unique = Int
 data Prog = Prog { root :: Exp
                  , rootBindings :: Bindings
                  , tydefs :: [TyDef]
-                 , tyvarMap :: Map TyVar Type
+                 , tyVarMap :: Map TyVar Type
+                 , univTyVarMap :: Map TyVar (Set TyVar)
                  , uniqC :: Unique
                  }
 
