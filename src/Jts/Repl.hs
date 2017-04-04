@@ -33,16 +33,16 @@ repl prog env = do
 
 doCommand :: Prog -> Env -> [String] -> InputT IO ()
 doCommand prog env (cmd:args)
-  | cmd == "q" || cmd == "quit" = lift exitSuccess
-  | cmd == "l" || cmd == "load" = do
+  | cmd == "q" = lift exitSuccess
+  | cmd == "l" = do
       progAndEnv <- runFile ((args !! 0) ++ ".jts") prog env
       printProgAndLoop progAndEnv
-  | cmd == "e" || cmd == "eval" = do let progOrE = interpret prog
-                                     case runExcept progOrE of
-                                       Left e -> outputStr $ (show e) ++ "\n\n"
-                                       Right prog -> printProg $ (prog, env)
-                                     repl prog env
-  | cmd == "t" || cmd == "typeof" || cmd == "it" =
+  | cmd == "e" = do let progOrE = interpret prog
+                    case runExcept progOrE of
+                      Left e -> outputStr $ (show e) ++ "\n\n"
+                      Right prog -> printProg $ (prog, env)
+                    repl prog env
+  | cmd == "t" || cmd == "it" =
     let (prefix:name) = args !! 0
         initial = cmd == "it"
         t = if prefix /= ':'
@@ -65,7 +65,7 @@ doCommand prog env (cmd:args)
                                                 else finalType prog t))
                               ++ "\n\n"
       repl prog env
-  | cmd == "c" || cmd == "constraints" =
+  | cmd == "c" =
     let (prefix:_name) = args !! 0
         name = if prefix == '@' then _name else prefix:_name
         u' = (reads name)::[(Int, String)]
@@ -82,6 +82,16 @@ doCommand prog env (cmd:args)
                                                  (Set.toList constrs))
       outputStr "\n"
       repl prog env
+  | cmd == "s" =
+    let (prefix:_name) = args !! 0
+        name = if prefix == ':' then _name else prefix:_name
+        ename = ExpName name
+    in case lookup ename (expNames env) of
+        Nothing -> do outputStr "\n"
+                      repl prog env
+        Just path -> do outputStr $
+                          unlines (map show (idsVisibleAtPath prog path))
+                        repl prog env
   where _showConstr u p ntv =
           (show (finalType p (TyVarType (TyVar u [])))) ++ " => "
             ++ (show (finalType p (TyVarType ntv)))

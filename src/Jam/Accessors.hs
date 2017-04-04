@@ -11,7 +11,8 @@ module Jam.Accessors (
   arity,
   getType,
   getBindings,
-  isTyCon
+  isTyCon,
+  idsVisibleAtPath
 ) where
 
 import Prelude hiding (lookup)
@@ -126,6 +127,19 @@ _foldIdHelper idU ident@(Id u _ _) _ _
 findRootId :: Prog -> Unique -> Maybe Id
 findRootId prog idU =
   foldWithKey (_foldIdHelper idU) Nothing $ rootBindings prog
+
+idsVisibleAtPath :: Prog -> ExpPath -> [Id]
+idsVisibleAtPath prog RootExpPath =
+  (keys (getBindings (root prog))) ++ (keys (rootBindings prog))
+idsVisibleAtPath prog path =
+  let parentPath = parentExpPath path
+      parentArg = case expAtPath prog parentPath of
+                    Just (LambdaExp _ _ a _ _) -> [a]
+                    _ -> []
+      parentIds = parentArg ++ (idsVisibleAtPath prog parentPath)
+      maybeExp = expAtPath prog path
+  in case maybeExp of Nothing -> parentIds
+                      Just e -> (keys (getBindings e)) ++ parentIds
 
 childExp :: ChildExpIndex -> Exp -> Maybe Exp
 childExp LambdaBodyIndex (LambdaExp _ _ _ body _) = Just body

@@ -7,7 +7,8 @@ module Util.IndexedMap (
   fromList,
   (!),
   getMap,
-  unionWith
+  unionWith,
+  keys
 ) where
 
 import Prelude hiding (lookup)
@@ -21,6 +22,8 @@ data Map k v = Map { kvMap :: Data.Map.Map k v
 
 getMap :: Map k v -> Data.Map.Map k v
 getMap = kvMap
+
+keys = Data.Map.keys . getMap
 
 empty = Map { kvMap = Data.Map.empty
             , ikMap = Data.Map.empty
