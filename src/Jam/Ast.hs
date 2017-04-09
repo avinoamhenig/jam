@@ -161,13 +161,13 @@ _wrapLet bindings s =
   let bindingStrs =
         Util.IndexedMap.foldWithKey
           (\(Id _ name _) val acc -> case val of
-            ExpVal ev -> ("(" ++ name ++ " = "
-                              ++ (deparen $ show ev) ++ ")") : acc
+            ExpVal ev -> ("   " ++ name ++ " = "
+                                 ++ (deparen $ show ev) ++ "\n") : acc
             _ -> acc )
           [] $ bindings
-      letStr = unwords bindingStrs
+      letStr = drop 3 $ unwords bindingStrs
   in if (length letStr) > 0
-      then "(let " ++ letStr ++ " in " ++ (deparen s) ++ ")"
+      then "(let " ++ letStr ++ "in " ++ (deparen s) ++ ")"
       else s
 instance Show Exp where
   show (BottomExp _ b) = _wrapLet b $ "_"
