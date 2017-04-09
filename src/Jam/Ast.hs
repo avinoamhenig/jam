@@ -5,6 +5,7 @@ module Jam.Ast (
   TyDef (..),
   TyCon (..),
   TyVar (..),
+  UnivTyVarConstraint (..),
   Type (..),
   Exp (..),
   Arity,
@@ -24,6 +25,7 @@ import Prelude hiding (lookup)
 import qualified Util.IndexedMap
 import Data.Map (Map)
 import Data.Set (Set)
+import qualified Data.Set as Set
 import Control.Monad.State
 import Data.List (intercalate)
 
@@ -34,7 +36,7 @@ data Prog = Prog { root :: Exp
                  , rootBindings :: Bindings
                  , tydefs :: [TyDef]
                  , tyVarMap :: Map TyVar Type
-                 , univTyVarMap :: Map TyVar (Set TyVar)
+                 , univTyVarMap :: Map TyVar (Set UnivTyVarConstraint)
                  , uniqC :: Unique
                  }
 
@@ -85,9 +87,14 @@ instance Eq Id where (Id u1 _ _) == (Id u2 _ _) = u1 == u2
 instance Ord Id where (Id u1 _ _) `compare` (Id u2 _ _) = u1 `compare` u2
 
 data TyVar = TyVar Unique [ExpPath]
-instance Show TyVar where show (TyVar u _) = "@" ++ (show u)
+instance Show TyVar where show (TyVar u _) = "@" ++ (show u) -- ++ (show s)
 instance Eq TyVar where (TyVar u1 _) == (TyVar u2 _) = u1 == u2
 instance Ord TyVar where (TyVar u1 _) `compare` (TyVar u2 _) = u1 `compare` u2
+
+data UnivTyVarConstraint = UnivTyVarConstraint TyVar TyVar Id
+                           deriving (Eq, Ord)
+instance Show UnivTyVarConstraint where
+  show (UnivTyVarConstraint utv tv _) = (show utv) ++ " =>" ++ (show tv)
 
 type Arity = Int
 data TyDef = TyDef Unique String Arity [TyCon]
@@ -122,7 +129,7 @@ instance Show Type where
     | otherwise = show td
   show (UniversalType t i) =
     let f = (\(TyVar _ scopes) -> all (\path -> isInsideBinding path i) scopes)
-        uTvs = filter f (tyVars t)
+        uTvs = (Set.toList . Set.fromList) $ filter f (tyVars t)
     in "∀" ++ (intercalate "," (map show uTvs))
            ++ ".(" ++ (deparen $ show t) ++ ")"
 

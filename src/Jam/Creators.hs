@@ -75,7 +75,8 @@ instantiateType (UniversalType t ident) =
      (newT, newTvMap) <- _copyVars (finalType p t) M.empty
      _ <- mapM (\(utv, ntv) -> modify
                 (\p -> p { univTyVarMap =
-                            M.insert utv (Set.insert ntv $
+                            M.insert utv (Set.insert
+                                          (UnivTyVarConstraint utv ntv ident) $
                                           M.findWithDefault Set.empty utv $
                                             univTyVarMap p)
                                          (univTyVarMap p) }))

@@ -1,0 +1,31 @@
+.l progs/list
+.l progs/mkls
+
+bnd :root $len :len
+
+rpl :len  Lambda($ls :body)
+
+rpl :body App(:f :caseEmpty)
+rpl :f    App(:f :caseCons)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($ls)
+
+rpl :caseEmpty Lambda($nil :body)
+rpl :body Num(0)
+
+rpl :caseCons Lambda($x  :body)
+rpl :body     Lambda($xs :body)
+rpl :body App(:f :a2)
+rpl :f    App(:f :a1)
+rpl :f IdExp($+)
+rpl :a1 Num(1)
+rpl :a2 App(:f :a)
+rpl :f IdExp($len)
+rpl :a IdExp($xs)
+
+rpl :root App(:f :a)
+rpl :f IdExp($len)
+rpl :a App(:f :a)
+rpl :f IdExp($mkLs)
+rpl :a Num(5)

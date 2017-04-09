@@ -37,7 +37,7 @@ rpl :a2 IdExp($n)
 
 
 -- === ulamChain ===
--- \n -> if n <= 1 then Nil else Cons n (ulamChain (ulam n))
+-- \n -> if n = 1 then Nil else Cons n (ulamChain (ulam n))
 
 bnd :root $ulamChain :ulamChain
 rpl :ulamChain Lambda($n :body)
@@ -46,7 +46,7 @@ rpl :body If(:c :t :e)
 -- if n <= 1
 rpl :c App(:f :a2)
 rpl :f App(:f :a1)
-rpl :f IdExp($<=)
+rpl :f IdExp($=)
 rpl :a1 IdExp($n)
 rpl :a2 Num(1)
 

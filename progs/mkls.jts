@@ -1,24 +1,24 @@
-bnd :root $mkLs :mkLs       -- mkLs = :mkLs
-rpl :mkLs Lambda($n :body)  -- mkLs = \n -> :body
+bnd :root $mkLs :mkLs
+rpl :mkLs Lambda($n :body)
 
-rpl :body If(:c :t :e) -- mkLs = \n -> if :c then :t else :e
+rpl :body If(:c :t :e)
 
-rpl :c App(:f :a2)  -- mkLs = \n -> if (:f :a2) then :t else :e
-rpl :f App(:f :a1)  -- mkLs = \n -> if ((:f :a1) :a2) then :t else :e
-rpl :f IdExp($=)    -- mkLs = \n -> if ((= :a1) :a2) then :t else :e
-rpl :a1 IdExp($n)   -- mkLs = \n -> if ((= n) :a2) then :t else :e
-rpl :a2 Num(0)      -- mkLs = \n -> if ((= n) 0) then :t else :e
+rpl :c App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($=)
+rpl :a1 IdExp($n)
+rpl :a2 Num(0)
 
-rpl :t IdExp($Nil)  -- mkLs = \n -> if ((= n) 0) then Nil else :e
+rpl :t IdExp($Nil)
 
-rpl :e App(:f :a2)  -- mkLs = \n -> if ((= n) 0) then Nil else (:f :a2)
-rpl :f App(:f :a1)  -- mkLs = \n -> if ((= n) 0) then Nil else ((:f :a1) :a2)
-rpl :f IdExp($Cons) -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons :a1) :a2)
-rpl :a1 IdExp($n)   -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) :a2)
-rpl :a2 App(:f :a)  -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (:f :a))
-rpl :f IdExp($mkLs) -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs :a))
-rpl :a App(:f :a2)  -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs (:f :a2))
-rpl :f App(:f :a1)  -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs ((:f :a1) :a2))
-rpl :f IdExp($-)    -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs ((- :a1) :a2))
-rpl :a1 IdExp($n)   -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs ((- n) :a2))
-rpl :a2 Num(1) -- mkLs = \n -> if ((= n) 0) then Nil else ((Cons n) (mkLs ((- n) 1))
+rpl :e App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 IdExp($n)
+rpl :a2 App(:f :a)
+rpl :f IdExp($mkLs)
+rpl :a App(:f :a2)
+rpl :f App(:f :a1)
+rpl :f IdExp($-)
+rpl :a1 IdExp($n)
+rpl :a2 Num(1)

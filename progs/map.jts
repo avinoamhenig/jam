@@ -1,0 +1,29 @@
+.l progs/list
+
+bnd :root $map :map
+
+rpl :map  Lambda($f  :body)
+rpl :body Lambda($ls :body)
+
+rpl :body App(:f :caseEmpty)
+rpl :f    App(:f :caseCons)
+rpl :f    App(:f :a)
+rpl :f IdExp($List.Decon)
+rpl :a IdExp($ls)
+
+rpl :caseEmpty Lambda($_ :body)
+rpl :body IdExp($Nil)
+
+rpl :caseCons Lambda($x  :body)
+rpl :body     Lambda($xs :body)
+rpl :body App(:f :a2)
+rpl :f    App(:f :a1)
+rpl :f IdExp($Cons)
+rpl :a1 App(:f :a)
+rpl :f IdExp($f)
+rpl :a IdExp($x)
+rpl :a2 App(:f :a2)
+rpl :f  App(:f :a1)
+rpl :f  IdExp($map)
+rpl :a1 IdExp($f)
+rpl :a2 IdExp($xs)

@@ -109,11 +109,17 @@ unify t1 t2 = do p <- get
     _mapTv :: TyVar -> Type -> State Prog Bool
     _mapTv tv t = do
       modify (\p -> p { tyVarMap = M.insert tv t (tyVarMap p) })
-      instT <- instantiateType t
       p <- get
-      bs <- mapM ((_unify instT) . (finalType p) .TyVarType)
+      bs <- mapM _unifyUnivConstraint
                  (Set.toList $ M.findWithDefault Set.empty tv (univTyVarMap p))
       return $ all id bs
+    _unifyUnivConstraint :: UnivTyVarConstraint -> State Prog Bool
+    _unifyUnivConstraint (UnivTyVarConstraint utv ntv ident) = do
+      p <- get
+      instT <- instantiateType (UniversalType (finalType p (TyVarType utv))
+                                              ident)
+      b <- _unify instT (finalType p (TyVarType ntv))
+      return b
 
     _unifyLists :: [Type] -> [Type] -> State Prog Bool
     _unifyLists [] [] = return True

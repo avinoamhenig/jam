@@ -1,10 +1,7 @@
 .l progs/list
 .l progs/tuple
 .l progs/ulam
-.l progs/mergesort
 
 rpl :root App(:f :a)
-rpl :f IdExp($mergesort)
-rpl :a App(:f :a)
 rpl :f IdExp($ulamChain)
 rpl :a Num(7)

@@ -78,7 +78,7 @@ doCommand prog env (cmd:args)
         Just t -> outputStr ("@" ++ name ++ " |-> " ++ (show t) ++ "\n")
       case lookup (TyVar u []) (univTyVarMap prog) of
         Nothing -> outputStr ""
-        Just constrs -> outputStr $ unlines (map (_showConstr u prog)
+        Just constrs -> outputStr $ unlines (map (_showConstr prog)
                                                  (Set.toList constrs))
       outputStr "\n"
       repl prog env
@@ -92,8 +92,8 @@ doCommand prog env (cmd:args)
         Just path -> do outputStr $
                           unlines (map show (idsVisibleAtPath prog path))
                         repl prog env
-  where _showConstr u p ntv =
-          (show (finalType p (TyVarType (TyVar u [])))) ++ " => "
+  where _showConstr p (UnivTyVarConstraint utv ntv _) =
+          (show (finalType p (TyVarType utv))) ++ " => "
             ++ (show (finalType p (TyVarType ntv)))
 doCommand prog env _ = do outputStr "Unrecognized command.\n"
                           repl prog env
