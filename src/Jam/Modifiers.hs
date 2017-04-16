@@ -3,7 +3,8 @@ module Jam.Modifiers (
   bind,
   addTyDef,
   setType,
-  prependScopes
+  prependScopes,
+  unify
 ) where
 
 import Prelude hiding (lookup)

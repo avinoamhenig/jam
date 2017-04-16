@@ -26,8 +26,8 @@ data ExpCreator = CrUnit
                 | CrIf ExpName ExpName ExpName
 
 data JtsCmd = BndCmd ExpName IdName ExpName -- BndCmd scope idName valName
-             | RplCmd ExpName ExpCreator
-             | TypCmd [TyDefDesc]
+            | RplCmd ExpName ExpCreator
+            | TypCmd [TyDefDesc]
 
 data TyDefDesc = TyDefDesc TyDefName [TyVarName] [ConsDef]
 

@@ -8,6 +8,7 @@ import Jts.Ast
 import Jts.Interpreter
 import Jam.Interpreter
 import Jam.Accessors
+import Jam.Suggestions
 import Jam.Basis
 import Data.Map hiding (map)
 import Prelude hiding (lookup)
@@ -89,8 +90,8 @@ doCommand prog env (cmd:args)
     in case lookup ename (expNames env) of
         Nothing -> do outputStr "\n"
                       repl prog env
-        Just path -> do outputStr $
-                          unlines (map show (idsVisibleAtPath prog path))
+        Just path -> do outputStr . unlines $
+                          map unlines (map (map show) (suggestions prog path ename))
                         repl prog env
   where _showConstr p (UnivTyVarConstraint utv ntv _) =
           (show (finalType p (TyVarType utv))) ++ " => "
