@@ -1,10 +1,16 @@
-To run: `runhaskell -W -isrc Jts.Repl`
+Jam is a senior thesis project, written by Avinoam Henig at Sarah Lawrence College.
 
-Then try: `.l example_programs/iszero`
-(you can also run individual transformation script lines).
+To run:
+1. Install Haskell.
+2. `runhaskell -W -isrc Jts.Repl`
 
-`.e` to eval.
+To test (after running):
+1. `.l progs/mergesort-test`
+2. `.p`
+3. `.e`
+4. `.t $id|:exp` to show type.
+5. `.q`
 
-`.q` to quit.
+(You can also run individual transformation script lines).
 
-`.t $id|:exp` to show type.
+More documentation: https://drive.google.com/open?id=0BwDiqlCX7oKEQ21JSDNhVnlwQ0k
