@@ -8,7 +8,7 @@ To test (after running):
 1. `.l progs/mergesort-test`
 2. `.p`
 3. `.e`
-4. `.t $id|:exp` to show type.
+4. `.t :root` to show type of root expression.
 5. `.q`
 
 (You can also run individual transformation script lines).
