@@ -25,24 +25,31 @@ repl prog env = do
   maybeLine <- getInputLine "-> "
   case maybeLine of
     Nothing -> lift exitSuccess
-    Just _line ->
-      let line = strip _line
-      in do
-        when (take 1 line == ".") $ doCommand prog env $ words $ drop 1 line
-        progAndEnv <- runLine line prog env
-        printProgAndLoop progAndEnv
+    Just _line -> let line = strip _line in
+      if line == "" || (((length line) > 1) && ((take 2) line == "--"))
+        then repl prog env
+        else do
+          do (prog', env') <- execLine prog env line
+             when (take 1 line /= ".") $ printProgAndLoop (prog', env')
+             repl prog' env'
 
-doCommand :: Prog -> Env -> [String] -> InputT IO ()
+execLine :: Prog -> Env -> String -> InputT IO (Prog, Env)
+execLine prog env line = let line' = strip line in
+  if line' == "" || (((length line') > 1) && ((take 2) line' == "--"))
+    then return (prog, env)
+    else if take 1 line' == "."
+          then doCommand prog env $ words $ drop 1 $ strip line'
+          else runLine line' prog env
+
+doCommand :: Prog -> Env -> [String] -> InputT IO (Prog, Env)
 doCommand prog env (cmd:args)
   | cmd == "q" = lift exitSuccess
-  | cmd == "l" = do
-      progAndEnv <- runFile ((args !! 0) ++ ".jts") prog env
-      printProgAndLoop progAndEnv
+  | cmd == "l" = runFile ((args !! 0) ++ ".jts") prog env
   | cmd == "e" = do let progOrE = interpret prog
                     case runExcept progOrE of
                       Left e -> outputStr $ (show e) ++ "\n\n"
                       Right prog -> printProg $ (prog, env)
-                    repl prog env
+                    return (prog, env)
   | cmd == "t" || cmd == "it" =
     let (prefix:name) = args !! 0
         initial = cmd == "it"
@@ -65,7 +72,7 @@ doCommand prog env (cmd:args)
         Just t -> outputStr $ (deparen $ show (if initial then t
                                                 else finalType prog t))
                               ++ "\n\n"
-      repl prog env
+      return (prog, env)
   | cmd == "c" =
     let (prefix:_name) = args !! 0
         name = if prefix == '@' then _name else prefix:_name
@@ -82,22 +89,41 @@ doCommand prog env (cmd:args)
         Just constrs -> outputStr $ unlines (map (_showConstr prog)
                                                  (Set.toList constrs))
       outputStr "\n"
-      repl prog env
+      return (prog, env)
   | cmd == "s" =
     let (prefix:_name) = args !! 0
         name = if prefix == ':' then _name else prefix:_name
         ename = ExpName name
     in case lookup ename (expNames env) of
         Nothing -> do outputStr "\n"
-                      repl prog env
+                      return (prog, env)
         Just path -> do outputStr . unlines $
                           map unlines (map (map show) (suggestions prog path ename))
-                        repl prog env
+                        return (prog, env)
+  | cmd == "p" = do printProg (prog, env)
+                    return (prog, env)
   where _showConstr p (UnivTyVarConstraint utv ntv _) =
           (show (finalType p (TyVarType utv))) ++ " => "
             ++ (show (finalType p (TyVarType ntv)))
 doCommand prog env _ = do outputStr "Unrecognized command.\n"
-                          repl prog env
+                          return (prog, env)
+
+runFile :: FilePath -> Prog -> Env -> InputT IO (Prog, Env)
+runFile file prog env = _runFile `catch` handleError
+  where _runFile = do
+          contents <- lift $ readFile file
+          let cmds = lines contents
+          progAndEnv <- execLines prog env cmds
+          return progAndEnv
+        handleError :: IOException -> InputT IO (Prog, Env)
+        handleError _ = do outputStr "File not found.\n\n"
+                           return (prog, env)
+        execLines :: Prog -> Env -> [String] -> InputT IO (Prog, Env)
+        execLines prog env [] = return (prog, env)
+        execLines prog env (line:cmds) = do
+          (prog', env') <- execLine prog env line
+          progAndEnv <- execLines prog' env' cmds
+          return progAndEnv
 
 printProg :: (Prog, Env) -> InputT IO ()
 printProg progAndEnv = let s = show $ fst progAndEnv
@@ -120,21 +146,6 @@ runLine code prog env = case readJtsCmd code of
                                          return (prog, env)
                             Right (prog, env) -> return (prog, env)
 
-runFile :: FilePath -> Prog -> Env -> InputT IO (Prog, Env)
-runFile file prog env = _runFile `catch` handleError
-  where _runFile = do
-          contents <- lift $ readFile file
-          case readJtsScript contents of
-            Left e -> do outputStr $ (show e) ++ "\n\n"
-                         return (prog, env)
-            Right script -> case runExcept $ runScript prog env script of
-              Left e -> do outputStr $ (show e) ++ "\n\n"
-                           return (prog, env)
-              Right (prog, env) -> return (prog, env)
-        handleError :: IOException -> InputT IO (Prog, Env)
-        handleError _ = do outputStr "File not found.\n\n"
-                           return (prog, env)
-
 strip = lstrip . rstrip
-lstrip = dropWhile (`elem` " \t")
+lstrip = dropWhile (`elem` " \t\n")
 rstrip = reverse . lstrip . reverse

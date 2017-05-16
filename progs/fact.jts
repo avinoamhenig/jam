@@ -1,8 +1,5 @@
 -- factorial
 
--- create root exp first so that we don't overwrite root bindings later
-rpl :root App(:rf :ra)
-
 -- create fact binding
 bnd :root $fact :fact
 
@@ -35,5 +32,6 @@ rpl :a1 IdExp($n)
 rpl :a2 Num(1)
 
 -- root exp: fact 5
+rpl :root App(:rf :ra)
 rpl :rf IdExp($fact)
 rpl :ra Num(5)
