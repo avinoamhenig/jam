@@ -1,7 +1,7 @@
 Jam is a senior thesis project, written by Avinoam Henig at Sarah Lawrence College.
 
 To run:
-1. Install Haskell.
+1. Install Haskell Platform.
 2. `runhaskell -W -isrc Jts.Repl`
 
 To test (after running):
